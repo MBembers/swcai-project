@@ -23,6 +23,35 @@ class CityGrid:
             for i in range(num_bins)
         ]
         self.depot = (width / 2, height / 2)
+        
+    def generate_realistic_city_graph(self, num_points: int, power=2.8):
+        city_radius = min(self.width, self.height) / 2
+
+        # Dense-center sampling
+        theta = np.random.uniform(0, 2*np.pi, num_points)
+        r = city_radius * np.random.rand(num_points)**power
+        centers = np.column_stack([r*np.cos(theta), r*np.sin(theta)])
+
+        vor = Voronoi(centers)
+        G = nx.Graph()
+
+        for ridge in vor.ridge_vertices:
+            if -1 in ridge:
+                continue
+
+            p1, p2 = vor.vertices[ridge[0]], vor.vertices[ridge[1]]
+
+            if np.linalg.norm(p1) <= city_radius and np.linalg.norm(p2) <= city_radius:
+                u = tuple(np.round(p1, 2))
+                v = tuple(np.round(p2, 2))
+                dist = float(np.linalg.norm(p1 - p2))
+                G.add_edge(u, v, weight=dist)
+
+        if G.number_of_nodes() == 0:
+            return G
+
+        main_city = max(nx.connected_components(G), key=len)
+        return G.subgraph(main_city).copy()
 
     def reset_all(self):
         """Resets all bins to their starting fill levels."""
