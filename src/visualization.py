@@ -30,7 +30,7 @@ def plot_simulation(city, truck, route_ids, sim):
     # 1. Background Road Network
     if city.graph:
         pos = {n: n for n in city.graph.nodes()}
-        nx.draw_networkx_edges(city.graph, pos, edge_color='#eeeeee', width=0.8, alpha=0.5)
+        nx.draw_networkx_edges(city.graph, pos, edge_color="#555555", width=0.8, alpha=0.5)
 
     # 2. Expert/Agent Layer: Bins with Load Spectrum
     # Color Map: Green (Empty) -> Yellow -> Red (Full)
