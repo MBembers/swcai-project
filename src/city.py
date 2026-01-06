@@ -2,6 +2,7 @@ import numpy as np
 from scipy.spatial import Voronoi
 import random
 import networkx as nx
+import math
 from enum import Enum
 from typing import Tuple, List, Dict
 
@@ -9,6 +10,10 @@ class CityType(Enum):
     REALISTIC = 1
     MANHATTAN = 2
     RANDOM = 3
+
+class DistributionType(Enum):
+    UNIFORM = 1
+    EXPONENTIAL_DECAY = 2
 
 class Bin:
     def __init__(self, bin_id: int, capacity: float, pos: Tuple[float, float]):
@@ -20,7 +25,7 @@ class Bin:
 
 class City:
     def __init__(self, width: float, height: float, num_points: int = 30, num_bins: int = 10, 
-                 city_type: CityType = CityType.REALISTIC):
+                 city_type: CityType = CityType.REALISTIC, distribution_type: DistributionType = DistributionType.UNIFORM):
         self.width = width
         self.height = height
         self.city_type = city_type
@@ -28,6 +33,9 @@ class City:
         # 1. Generate Graph
         if city_type == CityType.REALISTIC:
             self.graph = self._generate_voronoi_city(num_points)
+            self.valid_nodes = list(self.graph.nodes())
+        elif city_type == CityType.MANHATTAN:
+            self.graph = self._generate_manhattan_city(num_points)
             self.valid_nodes = list(self.graph.nodes())
         else:
             self.graph = None
@@ -49,8 +57,19 @@ class City:
         if len(available_locs) < num_bins:
             # Fallback if graph is too small (shouldn't happen with 1000 points)
             chosen_locs = random.choices(available_locs, k=num_bins)
-        else:
+        elif (distribution_type == DistributionType.UNIFORM):
             chosen_locs = random.sample(available_locs, num_bins)
+        elif (distribution_type == DistributionType.EXPONENTIAL_DECAY):
+            locs = np.array(available_locs, dtype = float)
+            center = np.array([self.width / 2.0, self.height / 2.0])
+            d = np.linalg.norm(locs - center, axis=1)
+            # Exponential decay scale
+            decay_scale = 0.30 * max(self.width, self.height)
+            decay_scale = max(decay_scale, 1e-9)
+            weights = np.exp(-d / decay_scale)
+            probs = weights / weights.sum()
+            idx = np.random.choice(len(available_locs), size=num_bins, replace=False, p=probs)
+            chosen_locs = [available_locs[i] for i in idx]
 
         for i in range(num_bins):
             # Varied capacity for realism
@@ -88,7 +107,46 @@ class City:
             largest_cc = max(nx.connected_components(G), key=len)
             return G.subgraph(largest_cc).copy()
         return G
+    
+    def _generate_manhattan_city(self, num_points) -> nx.Graph:
+        if num_points < 2:
+            return nx.Graph()
 
+        W, H = float(self.width), float(self.height)
+
+        # Choose grid dimensions to match aspect ratio and target num_points
+        aspect = W / H if H > 0 else 1.0
+        nx_count = max(2, int(math.ceil(math.sqrt(num_points * aspect))))
+        ny_count = max(2, int(math.ceil(num_points / nx_count)))
+
+        # Compute spacing so grid fits within width/height
+        sx = W / (nx_count - 1) if nx_count > 1 else 0.0
+        sy = H / (ny_count - 1) if ny_count > 1 else 0.0
+
+        # Build full integer grid first
+        G_full = nx.grid_2d_graph(nx_count, ny_count)  # nodes are (i, j)
+
+        # Map integer grid nodes -> (x, y) coordinates
+        mapping = {}
+        for (i, j) in G_full.nodes():
+            x = float(i * sx)
+            y = float(j * sy)
+            mapping[(i, j)] = (x, y)
+
+        G_full = nx.relabel_nodes(G_full, mapping)
+
+        # Keep exactly num_points nodes 
+        nodes_sorted = sorted(G_full.nodes(), key=lambda p: (p[0], p[1]))
+        keep_nodes = nodes_sorted[:num_points]
+        G = G_full.subgraph(keep_nodes).copy()
+
+        # Edge weights
+        for u, v in G.edges():
+            G[u][v]["weight"] = float(np.hypot(u[0] - v[0], u[1] - v[1]))
+
+        return G
+        
+    
     def _precompute_poi_distances(self):
         """Calculates shortest paths ONLY between Depot and Bins, and Bin to Bin."""
         # Points of Interest: Depot + All Bins
