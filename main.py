@@ -1,5 +1,5 @@
 from src import config  # loaded from data/config.yaml
-from src.city import CityGrid
+from src.city import City
 from src.agents import Truck
 from src.simulation import Simulation
 from src.evolution import GeneticOptimizer
@@ -7,7 +7,7 @@ from src.visualization import plot_simulation
 
 # ===== 1. Setup City =====
 city_config = config["city"]
-city = CityGrid(
+city = City(
     width=city_config.get("width", 200),
     height=city_config.get("height", 200),
     num_bins=city_config.get("num_bins", 80)

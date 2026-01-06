@@ -1,11 +1,11 @@
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import numpy as np
-from .city import CityGrid
+from .city import City 
 from .agents import Truck
 from .simulation import Simulation
 
-def print_route_details(city: CityGrid, truck: Truck, route_ids: list[int], sim: Simulation):
+def print_route_details(city: City, truck: Truck, route_ids: list[int], sim: Simulation):
     """Prints the precise sequence of bins for each trip."""
     print("\n" + "="*40)
     print("       OPTIMIZED ROUTE DETAILS       ")
@@ -37,7 +37,7 @@ def print_route_details(city: CityGrid, truck: Truck, route_ids: list[int], sim:
         print(f"TRIP {trip_count}: Depot -> {current_trip_bins} -> Depot (Load: {int(current_load)})")
     print("="*40 + "\n")
 
-def plot_simulation(city: CityGrid, truck: Truck, route_ids: list[int], sim: Simulation):
+def plot_simulation(city: City, truck: Truck, route_ids: list[int], sim: Simulation):
     # Print the route details first
     print_route_details(city, truck, route_ids, sim)
 
