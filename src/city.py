@@ -39,22 +39,34 @@ class City:
         self.bins: list[Bin] = []
     
 
-    def generate_realistic_city_graph(num_districts=60, city_radius=150):
-        # 1. Create random "district centers" denser in the middle
-        centers = np.random.normal(0, city_radius/2, (num_districts, 2))
+    def generate_realistic_city_graph(self, num_points: int, power=2.8):
+        city_radius = min(self.width, self.height) / 2
 
-        # 2. Generate Voronoi cells
+        # Dense-center sampling
+        theta = np.random.uniform(0, 2*np.pi, num_points)
+        r = city_radius * np.random.rand(num_points)**power
+        centers = np.column_stack([r*np.cos(theta), r*np.sin(theta)])
+
         vor = Voronoi(centers)
         G = nx.Graph()
 
-        # 3. Use Voronoi vertices as intersections
         for ridge in vor.ridge_vertices:
-            if -1 not in ridge:
-                p1, p2 = vor.vertices[ridge[0]], vor.vertices[ridge[1]]
-                if np.linalg.norm(p1) < city_radius and np.linalg.norm(p2) < city_radius:
-                    dist = np.linalg.norm(p1 - p2)
-                    u, v = tuple(np.round(p1, 2)), tuple(np.round(p2, 2))
-                    G.add_edge(u, v, weight=dist)
+            if -1 in ridge:
+                continue
+
+            p1, p2 = vor.vertices[ridge[0]], vor.vertices[ridge[1]]
+
+            if np.linalg.norm(p1) <= city_radius and np.linalg.norm(p2) <= city_radius:
+                u = tuple(np.round(p1, 2))
+                v = tuple(np.round(p2, 2))
+                dist = float(np.linalg.norm(p1 - p2))
+                G.add_edge(u, v, weight=dist)
+
+        if G.number_of_nodes() == 0:
+            return G
+
+        main_city = max(nx.connected_components(G), key=len)
+        return G.subgraph(main_city).copy()
 
         # Keep only the largest connected component
         main_city = max(nx.connected_components(G), key=len)
