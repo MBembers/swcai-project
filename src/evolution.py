@@ -2,10 +2,10 @@ import random
 from typing import List, Callable
 
 class GeneticOptimizer:
-    def __init__(self, bin_ids: List[int], fitness_fn: Callable, pop_size: int = 150):
+    def __init__(self, bin_ids: List[int], fitness_fn: Callable, pop_size: int = 50):
         self.bin_ids = bin_ids
         self.fitness_fn = fitness_fn
-        self.pop_size = pop_size
+        self.pop_size = pop_size # Reduced from 150 to 50 for speed
         self.population = [self._random_genome() for _ in range(pop_size)]
 
     def _random_genome(self) -> List[int]:
@@ -13,52 +13,46 @@ class GeneticOptimizer:
         random.shuffle(genome)
         return genome
 
-    def crossover(self, p1: List[int], p2: List[int]) -> List[int]:
-        # Ordered Crossover (OX) is essential for permutation problems like routing
-        size = len(p1)
-        a, b = sorted(random.sample(range(size), 2))
-        
-        child = [None] * size
-        child[a:b] = p1[a:b]
-        
-        p2_idx = 0
-        for i in range(size):
-            if child[i] is None:
-                while p2[p2_idx] in child:
-                    p2_idx += 1
-                child[i] = p2[p2_idx]
-        return child
-
-    def mutate(self, genome: List[int]):
-        # Swap Mutation: Swaps two random bins in the sequence
-        if random.random() < 0.2:
-            i, j = random.sample(range(len(genome)), 2)
-            genome[i], genome[j] = genome[j], genome[i]
-        
-        # Inversion Mutation: Reverses a sub-section of the route
-        if random.random() < 0.1:
-            i, j = sorted(random.sample(range(len(genome)), 2))
-            genome[i:j] = reversed(genome[i:j])
-
-    def evolve(self, generations: int = 200):
+    def evolve(self, generations: int = 100):
+        # Reduced generations from 200 to 50
         for gen in range(generations):
-            # Sort by fitness (lower is better)
-            self.population.sort(key=self.fitness_fn)
+            # Calculate fitness
+            scores = [(genome, self.fitness_fn(genome)) for genome in self.population]
+            scores.sort(key=lambda x: x[1]) # Lower is better
             
-            # Elitism: Keep the top 5
-            next_gen = self.population[:5]
+            # Elitism: Keep top 5
+            next_gen = [s[0] for s in scores[:5]]
             
+            # Breeding
             while len(next_gen) < self.pop_size:
-                # Tournament Selection
-                parent1 = min(random.sample(self.population, 5), key=self.fitness_fn)
-                parent2 = min(random.sample(self.population, 5), key=self.fitness_fn)
+                parent1 = random.choice(scores[:15])[0] # Tournament selection from top 15
+                parent2 = random.choice(scores[:15])[0]
                 
-                child = self.crossover(parent1, parent2)
-                self.mutate(child)
+                child = self._crossover(parent1, parent2)
+                self._mutate(child)
                 next_gen.append(child)
             
             self.population = next_gen
-            if gen % 20 == 0:
-                print(f"Gen {gen} | Best Distance: {self.fitness_fn(self.population[0]):.2f}")
+            if gen % 10 == 0:
+                print(f"Gen {gen} | Cost: {scores[0][1]:.2f}")
                 
-        return self.population[0]
+        return scores[0][0]
+
+    def _crossover(self, p1, p2):
+        # Order Crossover (OX)
+        start, end = sorted(random.sample(range(len(p1)), 2))
+        child = [None]*len(p1)
+        child[start:end] = p1[start:end]
+        
+        pointer = 0
+        for gene in p2:
+            if gene not in child[start:end]:
+                while child[pointer] is not None:
+                    pointer += 1
+                child[pointer] = gene
+        return child
+
+    def _mutate(self, genome):
+        if random.random() < 0.1:
+            i, j = random.sample(range(len(genome)), 2)
+            genome[i], genome[j] = genome[j], genome[i]
