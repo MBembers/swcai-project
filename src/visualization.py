@@ -1,82 +1,69 @@
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+import networkx as nx
 import numpy as np
-from .city import CityGrid
-from .agents import Truck
-from .simulation import Simulation
+from itertools import cycle
 
-def print_route_details(city: CityGrid, truck: Truck, route_ids: list[int], sim: Simulation):
-    """Prints the precise sequence of bins for each trip."""
-    print("\n" + "="*40)
-    print("       OPTIMIZED ROUTE DETAILS       ")
-    print("="*40)
-    
-    current_load = 0.0
-    trip_count = 1
-    current_trip_bins = []
+def get_actual_path_coords(city, start_pos, end_pos):
+    """
+    Finds the specific sequence of coordinates following the road network
+    between two points.
+    """
+    if not city.graph:
+        return [start_pos, end_pos]
 
-    for b_id in route_ids:
-        bin_obj = city.bins[b_id]
+    # Find closest graph nodes to the coordinate positions
+    # (In the new city implementation, bin.pos are already nodes, but this is safer)
+    try:
+        start_node = min(city.graph.nodes(), key=lambda n: city.distance(n, start_pos))
+        end_node = min(city.graph.nodes(), key=lambda n: city.distance(n, end_pos))
         
-        # Skip empty bins
-        if bin_obj.fill_level < 5:
-            continue
-            
-        # Check if full -> New Trip
-        if current_load + bin_obj.fill_level > truck.capacity:
-            print(f"TRIP {trip_count}: Depot -> {current_trip_bins} -> Depot (Load: {int(current_load)})")
-            trip_count += 1
-            current_load = 0.0
-            current_trip_bins = []
-            
-        current_trip_bins.append(bin_obj.id)
-        current_load += bin_obj.fill_level
+        path_nodes = nx.shortest_path(city.graph, start_node, end_node, weight='weight')
+        return path_nodes # List of tuples (x, y)
+    except (nx.NetworkXNoPath, ValueError):
+        return [start_pos, end_pos] # Fallback to straight line
 
-    # Print final trip
-    if current_trip_bins:
-        print(f"TRIP {trip_count}: Depot -> {current_trip_bins} -> Depot (Load: {int(current_load)})")
-    print("="*40 + "\n")
-
-def plot_simulation(city: CityGrid, truck: Truck, route_ids: list[int], sim: Simulation):
-    # Print the route details first
-    print_route_details(city, truck, route_ids, sim)
-
-    plt.figure(figsize=(10, 10))
+def plot_simulation(city, truck, route_ids, sim):
+    print("Preparing visualization...")
+    plt.figure(figsize=(12, 12))
     
-    # 1. Plot Bins
-    cmap = mcolors.LinearSegmentedColormap.from_list("waste", ["lightgreen", "gold", "red"])
+    # 1. Background Road Network
+    if city.graph:
+        pos = {n: n for n in city.graph.nodes()}
+        nx.draw_networkx_edges(city.graph, pos, edge_color="#555555", width=0.8, alpha=0.5)
+
+    # 2. Expert/Agent Layer: Bins with Load Spectrum
+    # Color Map: Green (Empty) -> Yellow -> Red (Full)
+    cmap = mcolors.LinearSegmentedColormap.from_list("waste", ["#2ecc71", "#f1c40f", "#e74c3c"])
     
     for b in city.bins:
-        fill_ratio = min(1.0, b.fill_level / 100.0)
-        color = cmap(fill_ratio)
-        plt.scatter(b.pos[0], b.pos[1], s=150, color=color, edgecolors='black', zorder=2)
-        plt.text(b.pos[0], b.pos[1]-4, f"{int(b.fill_level)}%", ha='center', fontsize=8, fontweight='bold')
-        # Add ID label
-        plt.text(b.pos[0], b.pos[1]+4, f"ID:{b.id}", ha='center', fontsize=8, color='blue')
+        fill_ratio = b.fill_level / b.capacity
+        color = cmap(max(0, min(1, fill_ratio)))
+        plt.scatter(b.pos[0], b.pos[1], s=100, color=color, edgecolors='black', zorder=5)
+        plt.text(b.pos[0], b.pos[1]+2, f"{int(fill_ratio*100)}%", fontsize=8, ha='center')
 
-    # 2. Plot Depot
-    plt.scatter(*city.depot, c='black', marker='s', s=200, label='Depot', zorder=3)
-
-    # 3. Plot Routes
+    # 3. GA/Agent Layer: Routes (Road-Following)
     segments = sim.get_trip_segments(route_ids)
-    colors = ['blue', 'purple', 'orange', 'cyan', 'magenta', 'brown'] 
+    colors = ['#3498db', '#9b59b6', '#e67e22', '#1abc9c']
     
-    for i, seg in enumerate(segments):
-        if len(seg) < 2: continue
+    for i, trip in enumerate(segments):
+        trip_color = colors[i % len(colors)]
+        for j in range(len(trip)-1):
+            try:
+                # Get the actual road nodes between targets
+                path_nodes = nx.shortest_path(city.graph, trip[j], trip[j+1], weight='weight')
+                xs, ys = zip(*path_nodes)
+                plt.plot(xs, ys, color=trip_color, linewidth=2, alpha=0.8, zorder=10)
+                
+                # Draw a single arrow if the path is long enough
+                if len(xs) > 2:
+                    mid = len(xs) // 2
+                    plt.annotate('', xy=(xs[mid+1], ys[mid+1]), xytext=(xs[mid], ys[mid]),
+                                 arrowprops=dict(arrowstyle='->', color=trip_color))
+            except:
+                plt.plot([trip[j][0], trip[j+1][0]], [trip[j][1], trip[j+1][1]], 
+                         color=trip_color, linestyle='--', alpha=0.3)
 
-        xs, ys = zip(*seg)
-        c = colors[i % len(colors)]
-        
-        plt.plot(xs, ys, color=c, linestyle='--', linewidth=2, alpha=0.6, label=f'Trip {i+1}')
-        
-        # Arrow Logic
-        mid_idx = (len(seg) - 1) // 2
-        p1 = seg[mid_idx]
-        p2 = seg[mid_idx + 1]
-        dx, dy = p2[0] - p1[0], p2[1] - p1[1]
-        plt.arrow(p1[0], p1[1], dx * 0.5, dy * 0.5, head_width=2, color=c, length_includes_head=True, zorder=4)
-
-    plt.title(f"Optimization Result: {len(segments)} Trips")
-    plt.legend(loc='upper right')
-    plt.grid(True, alpha=0.2)
+    plt.scatter(*city.depot, c='black', marker='s', s=200, label='Depot', zorder=15)
+    plt.title("Smart Waste Routing: Agent Paths Following Road Network")
     plt.show()
