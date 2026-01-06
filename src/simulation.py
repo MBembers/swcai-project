@@ -1,10 +1,9 @@
 from typing import List, Tuple
-from .city import CityGrid
+from .city import City
 from .agents import Truck
-from .utils import euclidean_distance
 
 class Simulation:
-    def __init__(self, city: CityGrid, truck: Truck):
+    def __init__(self, city: City, truck: Truck):
         self.city = city
         self.truck = truck
 
@@ -47,13 +46,13 @@ class Simulation:
         for seg in segments:
             bins_visited += (len(seg) - 2) # Subtract depot start and end
             for i in range(len(seg) - 1):
-                total_dist += euclidean_distance(seg[i], seg[i+1])
+                total_dist += city.distance(seg[i], seg[i+1])
         
         # IMPORTANT: Penalty for bins NOT visited. 
         # This forces the AI to include as many bins as possible in the route.
-        unvisited_penalty = (len(self.city.bins) - bins_visited) * 500
+        unvisited_penalty = (len(self.city.bins) - bins_visited) * 500 # get_from_config
         
         if total_dist == 0:
-            return 10000.0
+            return 10000.0 # get_from_config
             
         return total_dist + unvisited_penalty

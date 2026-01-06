@@ -60,4 +60,3 @@ class City:
         main_city = max(nx.connected_components(G), key=len)
         G = G.subgraph(main_city).copy()
         return G
-
