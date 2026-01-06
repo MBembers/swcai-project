@@ -5,7 +5,7 @@ from src.evolution import GeneticOptimizer
 from src.visualization import plot_simulation
 
 # 1. Setup: 30 bins
-city = CityGrid(100, 100, num_bins=30)
+city = CityGrid(200, 200, num_bins=80)
 
 # 2. Truck Capacity: Set to 800 (allows ~8-12 bins per trip)
 truck = Truck(truck_id=1, start_pos=city.depot, capacity=800.0)
