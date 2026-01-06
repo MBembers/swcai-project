@@ -18,7 +18,7 @@ class Simulation:
             target_bin = self.city.bins[b_id]
             
             # Skip if bin is mostly empty
-            if target_bin.fill_level < 10:
+            if target_bin.fill_level < 10: # get_from_config
                 continue
 
             # If bin exceeds capacity, return to depot first
