@@ -1,0 +1,12 @@
+
+city:
+  width: 100
+  height: 100
+  num_bins: 30
+
+truck:
+  capacity: 900.0
+
+evolution:
+  pop_size: 200
+  generations: 250
