@@ -19,7 +19,7 @@ class Bin:
         self.pos = pos
 
 class City:
-    def __init__(self, width: float, height: float, num_points: int = 100, num_bins: int = 30, 
+    def __init__(self, width: float, height: float, num_points: int = 30, num_bins: int = 10, 
                  city_type: CityType = CityType.REALISTIC):
         self.width = width
         self.height = height
