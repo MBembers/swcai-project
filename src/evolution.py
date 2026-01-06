@@ -13,7 +13,7 @@ class GeneticOptimizer:
         random.shuffle(genome)
         return genome
 
-    def evolve(self, generations: int = 50):
+    def evolve(self, generations: int = 100):
         # Reduced generations from 200 to 50
         for gen in range(generations):
             # Calculate fitness
