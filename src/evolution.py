@@ -2,11 +2,14 @@ import random
 from typing import List, Callable
 
 class GeneticOptimizer:
-    def __init__(self, bin_ids: List[int], fitness_fn: Callable, pop_size: int = 50):
+    def __init__(self, bin_ids: List[int], fitness_fn: Callable, pop_size: int = 50, baseline_route: List[int] = None):
         self.bin_ids = bin_ids
         self.fitness_fn = fitness_fn
         self.pop_size = pop_size # Reduced from 150 to 50 for speed
+        
         self.population = [self._random_genome() for _ in range(pop_size)]
+        if baseline_route:
+            self.population[0] = baseline_route.copy()  # Seed with baseline route
 
     def _random_genome(self) -> List[int]:
         genome = self.bin_ids.copy()
@@ -21,7 +24,7 @@ class GeneticOptimizer:
             scores.sort(key=lambda x: x[1]) # Lower is better
             
             # Elitism: Keep top 5
-            next_gen = [s[0] for s in scores[:5]]
+            next_gen = [s[0] for s in scores[:10]]
             
             # Breeding
             while len(next_gen) < self.pop_size:
@@ -33,7 +36,7 @@ class GeneticOptimizer:
                 next_gen.append(child)
             
             self.population = next_gen
-            if gen % 10 == 0:
+            if gen % 100 == 0:
                 print(f"Gen {gen} | Cost: {scores[0][1]:.2f}")
                 
         return scores[0][0]

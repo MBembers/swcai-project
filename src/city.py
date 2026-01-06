@@ -189,6 +189,35 @@ class City:
                 return np.linalg.norm(np.array(pos1) - np.array(pos2)) * 2
         
         return np.linalg.norm(np.array(pos1) - np.array(pos2))
+    
+    def generate_greedy_route(self) -> List[int]:
+        """
+        Generate a simple collection route using nearest-neighbor heuristic.
+        Returns a list of bin IDs in visit order.
+        
+        This is a greedy approximation to the TSP problem - not optimal but fast.
+        Time complexity: O(n²) where n is the number of bins.
+        """
+        if not self.bins:
+            return []
+        
+        # Start from depot
+        current_pos = self.depot
+        unvisited = set(range(len(self.bins)))
+        route = []
+        
+        while unvisited:
+            # Find nearest unvisited bin
+            nearest_bin_id = min(
+                unvisited,
+                key=lambda bid: self.distance(current_pos, self.bins[bid].pos)
+            )
+            
+            route.append(nearest_bin_id)
+            current_pos = self.bins[nearest_bin_id].pos
+            unvisited.remove(nearest_bin_id)
+        
+        return route
 
     def reset_all(self):
         pass
