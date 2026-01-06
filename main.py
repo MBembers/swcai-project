@@ -11,7 +11,7 @@ print("Generating City Graph...")
 city = City(
     width=200, 
     height=200, 
-    num_points=1200, 
+    num_points=400, 
     num_bins=300, # Factor of 10x
     city_type=CityType.REALISTIC,
     distribution_type=DistributionType.UNIFORM
@@ -21,7 +21,7 @@ city = City(
 truck = Truck(
     truck_id=1,
     start_pos=city.depot,
-    capacity=6000.0 # Factor of 20x
+    capacity=9000.0 # Factor of 20x
 )
 
 sim = Simulation(city, truck)
