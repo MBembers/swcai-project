@@ -1,4 +1,4 @@
-from src.city import City, CityType
+from src.city import City, CityType, DistributionType
 from src.agents import Truck
 from src.simulation import Simulation
 from src.evolution import GeneticOptimizer
@@ -13,7 +13,8 @@ city = City(
     height=200, 
     num_points=1200, 
     num_bins=300, # Factor of 10x
-    city_type=CityType.REALISTIC
+    city_type=CityType.MANHATTAN,
+    distribution_type=DistributionType.EXPONENTIAL_DECAY
 )
 
 # ===== 2. Truck (Scaled Up) =====
