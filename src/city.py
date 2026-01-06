@@ -100,7 +100,8 @@ class City:
                 u = tuple(np.round(p1, 1))
                 v = tuple(np.round(p2, 1))
                 dist = np.linalg.norm(p1 - p2)
-                G.add_edge(u, v, weight=dist)
+                if u != v:
+                    G.add_edge(u, v, weight=dist)
 
         # Return largest connected component
         if len(G) > 0:
