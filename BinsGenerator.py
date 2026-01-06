@@ -97,7 +97,7 @@ class BinsGenerator:
             raise ValueError(
                 "No bins to save. Generate bins first using generate_bins().")
 
-        filepath = Path(filename)
+        filepath = Path("data") / filename
         filepath.parent.mkdir(parents=True, exist_ok=True)
 
         with open(filepath, 'w', newline='') as csvfile:
@@ -122,7 +122,7 @@ class BinsGenerator:
             List of Bin objects loaded from file
         """
         self.bins = []
-        filepath = Path(filename)
+        filepath = Path("data") / filename
 
         if not filepath.exists():
             raise FileNotFoundError(f"File not found: {filename}")
