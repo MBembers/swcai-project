@@ -1,12 +1,41 @@
 
 city:
-  width: 100
-  height: 100
-  num_bins: 30
+  width: 200
+  height: 200
+  num_points: 1200
+  num_bins: 300
+  coordinate_rounding: 1
+  progress_interval: 50
+
+bins:
+  min_fill_level_ratio: 0.05
+  capacity_options: [50, 100, 200]
 
 truck:
-  capacity: 900.0
+  capacity: 6000.0
+
+expert_rules:
+  min_fill_threshold: 0.40
+  critical_threshold: 0.90
 
 evolution:
-  pop_size: 200
-  generations: 250
+  pop_size: 60
+  generations: 60
+  elitism_count: 5
+  tournament_selection_size: 15
+  mutation_probability: 0.1
+  progress_interval: 10
+
+visualization:
+  figure_size: [12, 12]
+  edge_width: 0.8
+  edge_alpha: 0.5
+  bin_scatter_size: 100
+  bin_text_offset: 2
+  bin_font_size: 8
+  bin_zorder: 5
+  route_line_width: 2
+  route_alpha: 0.8
+  route_zorder: 10
+  depot_marker_size: 200
+  depot_zorder: 15
