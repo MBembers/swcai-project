@@ -4,6 +4,7 @@ import random
 import networkx as nx
 from enum import Enum
 from typing import Tuple, List, Dict
+from .config import CONFIG
 
 class CityType(Enum):
     REALISTIC = 1
@@ -14,8 +15,8 @@ class Bin:
     def __init__(self, bin_id: int, capacity: float, pos: Tuple[float, float]):
         self.id = bin_id
         self.capacity = capacity
-        # Random fill between 5% and 100%
-        self.fill_level = np.random.uniform(capacity * 0.05, capacity) 
+        # Random fill between config min and 100%
+        self.fill_level = np.random.uniform(capacity * CONFIG['bins']['min_fill_level_ratio'], capacity) 
         self.pos = pos
 
 class City:
@@ -54,7 +55,7 @@ class City:
 
         for i in range(num_bins):
             # Varied capacity for realism
-            cap = random.choice([50, 100, 200]) 
+            cap = random.choice(CONFIG['bins']['capacity_options']) 
             b = Bin(i, capacity=cap, pos=chosen_locs[i])
             self.bins.append(b)
 
@@ -78,8 +79,8 @@ class City:
                 0 <= p2[0] <= self.width and 0 <= p2[1] <= self.height):
                 
                 # Rounding keys is crucial for matching coords later
-                u = tuple(np.round(p1, 1))
-                v = tuple(np.round(p2, 1))
+                u = tuple(np.round(p1, CONFIG['city']['coordinate_rounding']))
+                v = tuple(np.round(p2, CONFIG['city']['coordinate_rounding']))
                 dist = np.linalg.norm(p1 - p2)
                 G.add_edge(u, v, weight=dist)
 
@@ -110,7 +111,7 @@ class City:
                     self.dist_cache[(start_node, end_node)] = length_dict[end_node]
             
             count += 1
-            if count % 50 == 0:
+            if count % CONFIG['city']['progress_interval'] == 0:
                 print(f"  Mapped {count}/{total} nodes...")
 
     def distance(self, pos1, pos2):
