@@ -1,3 +1,4 @@
+from src.config import CONFIG
 from src.city import City, CityType, DistributionType
 from src.agents import Truck
 from src.simulation import Simulation
@@ -9,19 +10,19 @@ from src.expert_rules import Action
 # Increased num_points to 1200 to accommodate 300 bins comfortably
 print("Generating City Graph...")
 city = City(
-    width=200, 
-    height=200, 
-    num_points=1200, 
-    num_bins=300, # Factor of 10x
+    width=CONFIG['city']['width'], 
+    height=CONFIG['city']['height'], 
+    num_points=CONFIG['city']['num_points'], 
+    num_bins=CONFIG['city']['num_bins'],
     city_type=CityType.REALISTIC,
-    distribution_type=DistributionType.UNIFORM
+  distribution_type=DistributionType.UNIFORM
 )
 
 # ===== 2. Truck (Scaled Up) =====
 truck = Truck(
     truck_id=1,
     start_pos=city.depot,
-    capacity=6000.0 # Factor of 20x
+    capacity=CONFIG['truck']['capacity']
 )
 
 sim = Simulation(city, truck)
@@ -54,13 +55,13 @@ print(f"Greedy route -> distance: {greedy_dist:.2f}, trips/penalty proxy: {greed
 optimizer = GeneticOptimizer(
     active_bin_ids,
     sim.get_fitness,
-    pop_size=80, # Slightly larger population for larger search space
+    pop_size=CONFIG['evolution']['pop_size'], # Slightly larger population for larger search space
     baseline_route=greedy_route
 )
 
 print("Starting Evolution...")
 # Run for more generations to handle the complexity
-best_route = optimizer.evolve(generations=2000)
+best_route = optimizer.evolve(generations=CONFIG['evolution']['generations'])
 
 # ===== 4. Compare and Visualize =====
 # Evaluate GA route
