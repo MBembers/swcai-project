@@ -1,5 +1,5 @@
 import random
-from typing import List, Callable
+from typing import List, Callable, Tuple
 from .config import CONFIG
 
 class GeneticOptimizer:
@@ -8,25 +8,51 @@ class GeneticOptimizer:
             pop_size = CONFIG['evolution']['pop_size']
         self.bin_ids = bin_ids
         self.fitness_fn = fitness_fn
-        self.pop_size = pop_size # Reduced from 150 to 50 for speed
+        self.pop_size = pop_size
         
         self.population = [self._random_genome() for _ in range(pop_size)]
         if baseline_route:
-            self.population[0] = baseline_route.copy()  # Seed with baseline route
+            self.population[0] = baseline_route.copy()
 
     def _random_genome(self) -> List[int]:
         genome = self.bin_ids.copy()
         random.shuffle(genome)
         return genome
 
-    def evolve(self, generations: int = None):
-        if generations is None:
-            generations = CONFIG['evolution']['generations']
-        # Calculate fitness
-        for gen in range(generations):
+    def evolve(self, max_generations: int = None, patience: int = None) -> Tuple[List[int], int]:
+        """
+        Evolve population until stopping criterion is met.
+        
+        Args:
+            max_generations: Maximum generations to run (safety limit)
+            patience: Stop if no improvement for this many generations
+            
+        Returns:
+            (best_route, generations_run)
+        """
+        if max_generations is None:
+            max_generations = CONFIG['evolution']['generations']
+        if patience is None:
+            patience = CONFIG['evolution'].get('patience', 100)
+        
+        best_fitness = float('inf')
+        generations_without_improvement = 0
+        best_genome = None
+        
+        for gen in range(max_generations):
             # Calculate fitness
             scores = [(genome, self.fitness_fn(genome)) for genome in self.population]
-            scores.sort(key=lambda x: x[1]) # Lower is better
+            scores.sort(key=lambda x: x[1])  # Lower is better
+            
+            current_best_fitness = scores[0][1]
+            
+            # Check for improvement
+            if current_best_fitness < best_fitness:
+                best_fitness = current_best_fitness
+                generations_without_improvement = 0
+                best_genome = scores[0][0]
+            else:
+                generations_without_improvement += 1
             
             # Elitism: Keep top N
             next_gen = [s[0] for s in scores[:CONFIG['evolution']['elitism_count']]]
@@ -41,10 +67,16 @@ class GeneticOptimizer:
                 next_gen.append(child)
             
             self.population = next_gen
+            
             if gen % CONFIG['evolution']['progress_interval'] == 0:
-                print(f"Gen {gen} | Cost: {scores[0][1]:.2f}")
-                
-        return scores[0][0]
+                print(f"Gen {gen} | Cost: {current_best_fitness:.2f} | No improvement: {generations_without_improvement}/{patience}")
+            
+            # Early stopping criterion
+            if generations_without_improvement >= patience:
+                print(f"Stopping at generation {gen}: {patience} generations without improvement")
+                break
+        
+        return best_genome, gen + 1
 
     def _crossover(self, p1, p2):
         # Order Crossover (OX)

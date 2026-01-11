@@ -20,6 +20,7 @@ class Simulation:
             for b in self.city.bins
         }
         self.current_day = 0
+        self.current_observed_fills = {}  # Cache observations for this collection cycle
 
     def refill_bins(self, days: int = 1):
         """Advance time and refill bins according to predisposition plus noise."""
@@ -30,6 +31,21 @@ class Simulation:
             delta = max(0.0, expected_add + noise)
             b.fill_level = min(b.capacity, b.fill_level + delta)
         self.current_day += days
+
+    def sample_collection_observations(self):
+        """
+        Sample observations for all bins at the START of a collection run.
+        This ensures the GA optimizes against consistent data.
+        """
+        self.current_observed_fills = {}
+        for b in self.city.bins:
+            self.current_observed_fills[b.id] = self._get_observed_fill_level(b)
+
+    def _get_cached_observed_fill(self, bin_id: int) -> float:
+        """Use cached observation if available, otherwise sample fresh."""
+        if bin_id in self.current_observed_fills:
+            return self.current_observed_fills[bin_id]
+        return self._get_observed_fill_level(self.city.bins[bin_id])
 
     def _get_observed_fill_level(self, bin_obj) -> float:
         """
@@ -60,8 +76,8 @@ class Simulation:
         for bin_id in proposed_sequence:
             target_bin = self.city.bins[bin_id]
             
-            # --- Capacity Check with Observed Fill Level ---
-            observed_fill = self._get_observed_fill_level(target_bin)
+            # --- Capacity Check with Observed Fill Level (use cached) ---
+            observed_fill = self._get_cached_observed_fill(bin_id)
             
             # Skip if bin is empty
             if observed_fill <= 0:
@@ -196,8 +212,8 @@ class Simulation:
         for b_id in route_ids:
             target_bin = self.city.bins[b_id]
             
-            # Use observed fill level with uncertainty
-            observed_fill = self._get_observed_fill_level(target_bin)
+            # Use cached observed fill level with uncertainty
+            observed_fill = self._get_cached_observed_fill(b_id)
             
             # Skip if bin is empty
             if observed_fill <= 0:

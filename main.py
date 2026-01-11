@@ -48,6 +48,9 @@ for day in range(1, total_days + 1):
     print(f"Day {day}: Collection Run #{collection_count}")
     print(f"{'='*70}")
     
+    # Sample observations ONCE for this collection cycle
+    sim.sample_collection_observations()
+    
     # Use learned rates to choose bins likely to be worth visiting by next collection
     active_bin_ids = sim.plan_active_bins(collection_interval_days=interval)
     print(f"Active bins for this run: {len(active_bin_ids)} / {len(city.bins)}")
@@ -68,9 +71,12 @@ for day in range(1, total_days + 1):
         baseline_route=greedy_route
     )
 
-    best_route = optimizer.evolve(generations=CONFIG['evolution']['generations'])
+    best_route, generations_run = optimizer.evolve(
+        max_generations=CONFIG['evolution']['generations'],
+        patience=CONFIG['evolution'].get('patience', 100)
+    )
     ga_dist, _, ga_collected = sim.simulate_route(best_route)
-    print(f"GA     -> distance: {ga_dist:8.2f} | bins collected: {ga_collected:3d}")
+    print(f"GA     -> distance: {ga_dist:8.2f} | bins collected: {ga_collected:3d} | generations: {generations_run}")
     ga_total_distance += ga_dist
 
     # Execute best route, updating bin states and learning rates
