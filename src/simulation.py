@@ -10,6 +10,26 @@ class Simulation:
         self.city = city
         self.truck = truck
         self.expert = ExpertRules(min_fill_threshold=CONFIG['expert_rules']['min_fill_threshold'])
+        base_rate = CONFIG['bin_refill']['base_rate_ratio']
+        # Track learned fill rates and visit history per bin
+        self.bin_profiles = {
+            b.id: {
+                'last_visit_day': 0,
+                'observed_rate': base_rate  # ratio of capacity per day
+            }
+            for b in self.city.bins
+        }
+        self.current_day = 0
+
+    def refill_bins(self, days: int = 1):
+        """Advance time and refill bins according to predisposition plus noise."""
+        noise_sigma_ratio = CONFIG['bin_refill']['noise_sigma_ratio']
+        for b in self.city.bins:
+            expected_add = b.fill_rate * b.capacity * days
+            noise = np.random.normal(0.0, b.capacity * noise_sigma_ratio * np.sqrt(days))
+            delta = max(0.0, expected_add + noise)
+            b.fill_level = min(b.capacity, b.fill_level + delta)
+        self.current_day += days
 
     def _get_observed_fill_level(self, bin_obj) -> float:
         """
@@ -82,6 +102,80 @@ class Simulation:
         # Heuristic Penalty: We want fewer trips if possible, but mainly shorter distance
         # Heavy penalty for uncollected bins is handled in get_fitness
         
+        return total_distance, penalty, bins_collected
+
+    def plan_active_bins(self, collection_interval_days: int) -> List[int]:
+        """
+        Decide which bins to visit, using learned rates to anticipate fast fillers.
+        Bins predicted to reach the expert threshold by the next collection are included.
+        """
+        active_bin_ids = []
+        threshold = CONFIG['expert_rules']['min_fill_threshold']
+        for b in self.city.bins:
+            profile = self.bin_profiles[b.id]
+            predicted_fill = min(
+                b.capacity,
+                b.fill_level + b.capacity * profile['observed_rate'] * collection_interval_days
+            )
+            predicted_ratio = predicted_fill / b.capacity if b.capacity > 0 else 0.0
+            if predicted_ratio >= threshold:
+                active_bin_ids.append(b.id)
+        return active_bin_ids
+
+    def execute_route(self, proposed_sequence: List[int]) -> Tuple[float, float, int]:
+        """
+        Stateful version of simulate_route: updates bin fill levels and learned rates.
+        """
+        current_pos = self.city.depot
+        current_load = 0.0
+        total_distance = 0.0
+        bins_collected = 0
+        penalty = 0.0
+        learning_rate = CONFIG['bin_refill']['learning_rate']
+
+        for bin_id in proposed_sequence:
+            target_bin = self.city.bins[bin_id]
+            observed_fill = self._get_observed_fill_level(target_bin)
+
+            if observed_fill <= 0:
+                continue
+
+            space_available = self.truck.capacity - current_load
+
+            if observed_fill <= space_available:
+                dist = self.city.distance(current_pos, target_bin.pos)
+                total_distance += dist
+                current_pos = target_bin.pos
+                amount_taken = observed_fill
+                current_load += amount_taken
+                bins_collected += 1
+            else:
+                if space_available > 0:
+                    dist = self.city.distance(current_pos, target_bin.pos)
+                    total_distance += dist
+                    current_pos = target_bin.pos
+                    amount_taken = space_available
+                    current_load += amount_taken
+                    bins_collected += 1
+                else:
+                    amount_taken = 0.0
+
+                # Return to depot after filling up
+                dist_to_depot = self.city.distance(current_pos, self.city.depot)
+                total_distance += dist_to_depot
+                current_pos = self.city.depot
+                current_load = 0.0
+
+            # Update bin state with actual collected amount
+            if amount_taken > 0:
+                target_bin.fill_level = max(0.0, target_bin.fill_level - amount_taken)
+                profile = self.bin_profiles[target_bin.id]
+                days_since_last = max(1, self.current_day - profile['last_visit_day'])
+                observed_daily_rate = (amount_taken / target_bin.capacity) / days_since_last if target_bin.capacity > 0 else 0.0
+                profile['observed_rate'] = (1 - learning_rate) * profile['observed_rate'] + learning_rate * observed_daily_rate
+                profile['last_visit_day'] = self.current_day
+
+        total_distance += self.city.distance(current_pos, self.city.depot)
         return total_distance, penalty, bins_collected
 
     def get_fitness(self, genome: List[int]) -> float:

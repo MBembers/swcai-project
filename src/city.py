@@ -22,6 +22,10 @@ class Bin:
         self.capacity = capacity
         # Random fill between config min and 100%
         self.fill_level = np.random.uniform(capacity * CONFIG['bins']['min_fill_level_ratio'], capacity) 
+        # Per-bin predisposition for how quickly it fills (ratio of capacity per day)
+        mu = CONFIG['bin_refill']['base_rate_ratio']
+        sigma = CONFIG['bin_refill']['rate_sigma_ratio']
+        self.fill_rate = max(0.0, np.random.normal(mu, sigma))
         self.pos = pos
 
 class City:
