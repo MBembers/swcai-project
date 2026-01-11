@@ -2,7 +2,7 @@ city:
   width: 200
   height: 200
   num_points: 1200
-  num_bins: 300
+  num_bins: 100
   coordinate_rounding: 1
   progress_interval: 50
 
