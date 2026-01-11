@@ -3,6 +3,7 @@ import matplotlib.colors as mcolors
 import networkx as nx
 import numpy as np
 from itertools import cycle
+from .config import CONFIG
 
 def get_actual_path_coords(city, start_pos, end_pos):
     """
@@ -25,12 +26,14 @@ def get_actual_path_coords(city, start_pos, end_pos):
 
 def plot_simulation(city, truck, route_ids, sim):
     print("Preparing visualization...")
-    plt.figure(figsize=(12, 12))
+    plt.figure(figsize=tuple(CONFIG['visualization']['figure_size']))
     
     # 1. Background Road Network
     if city.graph:
         pos = {n: n for n in city.graph.nodes()}
-        nx.draw_networkx_edges(city.graph, pos, edge_color="#555555", width=0.8, alpha=0.5)
+        nx.draw_networkx_edges(city.graph, pos, edge_color="#555555", 
+                               width=CONFIG['visualization']['edge_width'], 
+                               alpha=CONFIG['visualization']['edge_alpha'])
 
     # 2. Expert/Agent Layer: Bins with Load Spectrum
     # Color Map: Green (Empty) -> Yellow -> Red (Full)
@@ -39,8 +42,10 @@ def plot_simulation(city, truck, route_ids, sim):
     for b in city.bins:
         fill_ratio = b.fill_level / b.capacity
         color = cmap(max(0, min(1, fill_ratio)))
-        plt.scatter(b.pos[0], b.pos[1], s=100, color=color, edgecolors='black', zorder=5)
-        plt.text(b.pos[0], b.pos[1]+2, f"{int(fill_ratio*100)}%", fontsize=8, ha='center')
+        plt.scatter(b.pos[0], b.pos[1], s=CONFIG['visualization']['bin_scatter_size'], 
+                    color=color, edgecolors='black', zorder=CONFIG['visualization']['bin_zorder'])
+        plt.text(b.pos[0], b.pos[1]+CONFIG['visualization']['bin_text_offset'], f"{int(fill_ratio*100)}%", 
+                fontsize=CONFIG['visualization']['bin_font_size'], ha='center')
 
     # 3. GA/Agent Layer: Routes (Road-Following)
     segments = sim.get_trip_segments(route_ids)
@@ -53,7 +58,8 @@ def plot_simulation(city, truck, route_ids, sim):
                 # Get the actual road nodes between targets
                 path_nodes = nx.shortest_path(city.graph, trip[j], trip[j+1], weight='weight')
                 xs, ys = zip(*path_nodes)
-                plt.plot(xs, ys, color=trip_color, linewidth=2, alpha=0.8, zorder=10)
+                plt.plot(xs, ys, color=trip_color, linewidth=CONFIG['visualization']['route_line_width'], 
+                        alpha=CONFIG['visualization']['route_alpha'], zorder=CONFIG['visualization']['route_zorder'])
                 
                 # Draw a single arrow if the path is long enough
                 if len(xs) > 2:
@@ -64,6 +70,7 @@ def plot_simulation(city, truck, route_ids, sim):
                 plt.plot([trip[j][0], trip[j+1][0]], [trip[j][1], trip[j+1][1]], 
                          color=trip_color, linestyle='--', alpha=0.3)
 
-    plt.scatter(*city.depot, c='black', marker='s', s=200, label='Depot', zorder=15)
+    plt.scatter(*city.depot, c='black', marker='s', s=CONFIG['visualization']['depot_marker_size'], 
+                label='Depot', zorder=CONFIG['visualization']['depot_zorder'])
     plt.title("Smart Waste Routing: Agent Paths Following Road Network")
     plt.show()

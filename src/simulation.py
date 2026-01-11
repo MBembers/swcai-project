@@ -2,12 +2,13 @@ from typing import List, Tuple
 from .city import City
 from .agents import Truck
 from .expert_rules import ExpertRules, Action
+from .config import CONFIG
 
 class Simulation:
     def __init__(self, city: City, truck: Truck):
         self.city = city
         self.truck = truck
-        self.expert = ExpertRules(min_fill_threshold=0.40)
+        self.expert = ExpertRules(min_fill_threshold=CONFIG['expert_rules']['min_fill_threshold'])
 
     def simulate_route(self, proposed_sequence: List[int]) -> Tuple[float, float, int]:
         current_pos = self.city.depot
