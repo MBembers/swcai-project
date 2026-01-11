@@ -14,8 +14,8 @@ city = City(
     height=CONFIG['city']['height'], 
     num_points=CONFIG['city']['num_points'], 
     num_bins=CONFIG['city']['num_bins'],
-    city_type=CityType.REALISTIC,
-  distribution_type=DistributionType.UNIFORM
+    city_type=CityType.MANHATTAN,
+    distribution_type=DistributionType.EXPONENTIAL_DECAY
 )
 
 # ===== 2. Truck (Scaled Up) =====
@@ -77,6 +77,6 @@ else:
 
 # Visualize both routes sequentially
 print("Plotting Greedy route...")
-# plot_simulation(city, truck, greedy_route, sim)
+plot_simulation(city, truck, greedy_route, sim)
 print("Plotting Genetic route...")
-# plot_simulation(city, truck, best_route, sim)
+plot_simulation(city, truck, best_route, sim)
