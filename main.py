@@ -3,7 +3,7 @@ from src.city import City, CityType, DistributionType
 from src.agents import Truck
 from src.simulation import Simulation
 from src.evolution import GeneticOptimizer
-from src.visualization import plot_simulation
+from src.visualization import plot_simulation, plot_heatmap_comparison, plot_collection_statistics, plot_route_comparison, plot_aggregate_route_changes
 from src.expert_rules import Action
 
 # ===== 1. Setup City (Scaled Up) =====
@@ -14,8 +14,8 @@ city = City(
     height=CONFIG['city']['height'], 
     num_points=CONFIG['city']['num_points'], 
     num_bins=CONFIG['city']['num_bins'],
-    city_type=CityType.REALISTIC,
-  distribution_type=DistributionType.UNIFORM
+    city_type=CityType.MANHATTAN,
+  distribution_type=DistributionType.EXPONENTIAL_DECAY
 )
 
 # ===== 2. Truck (Scaled Up) =====
@@ -36,6 +36,26 @@ print(f"Running simulation for {total_days} days, collections every {interval} d
 greedy_total_distance = 0.0
 ga_total_distance = 0.0
 collection_count = 0
+
+# Track visit frequencies for heatmap
+greedy_visits = {}
+ga_visits = {}
+for b in city.bins:
+    greedy_visits[b.id] = 0
+    ga_visits[b.id] = 0
+
+greedy_distances = []
+ga_distances = []
+collection_numbers = []
+
+# Track route edge changes for aggregate visualization
+all_removed_edges = {}
+all_added_edges = {}
+all_common_edges = {}
+
+last_collection_num = 0
+last_greedy_route = None
+last_ga_route = None
 
 for day in range(1, total_days + 1):
     sim.refill_bins(days=1)
@@ -62,6 +82,11 @@ for day in range(1, total_days + 1):
     greedy_dist, _, greedy_collected = sim.simulate_route(greedy_route)
     print(f"Greedy -> distance: {greedy_dist:8.2f} | bins collected: {greedy_collected:3d}")
     greedy_total_distance += greedy_dist
+    greedy_distances.append(greedy_dist)
+    
+    # Track greedy visits
+    for bin_id in greedy_route[:greedy_collected]:
+        greedy_visits[bin_id] += 1
 
     # Optimize with GA starting from greedy
     optimizer = GeneticOptimizer(
@@ -78,6 +103,33 @@ for day in range(1, total_days + 1):
     ga_dist, _, ga_collected = sim.simulate_route(best_route)
     print(f"GA     -> distance: {ga_dist:8.2f} | bins collected: {ga_collected:3d} | generations: {generations_run}")
     ga_total_distance += ga_dist
+    ga_distances.append(ga_dist)
+    
+    # Track GA visits
+    for bin_id in best_route[:ga_collected]:
+        ga_visits[bin_id] += 1
+    
+    collection_numbers.append(collection_count)
+    
+    # Track route changes
+    from src.visualization import _get_route_edges
+    greedy_edges = _get_route_edges(city, greedy_route)
+    ga_edges = _get_route_edges(city, best_route)
+    
+    removed = greedy_edges - ga_edges
+    added = ga_edges - greedy_edges
+    common = greedy_edges & ga_edges
+    
+    for edge in removed:
+        all_removed_edges[edge] = all_removed_edges.get(edge, 0) + 1
+    for edge in added:
+        all_added_edges[edge] = all_added_edges.get(edge, 0) + 1
+    for edge in common:
+        all_common_edges[edge] = all_common_edges.get(edge, 0) + 1
+    
+    last_collection_num = collection_count
+    last_greedy_route = greedy_route
+    last_ga_route = best_route
 
     # Execute best route, updating bin states and learning rates
     best_executed_route = greedy_route if greedy_dist < ga_dist else best_route
@@ -94,4 +146,15 @@ if greedy_total_distance > 0:
     improvement = (greedy_total_distance - ga_total_distance) / greedy_total_distance * 100.0
     print(f"\nGA improvement over Greedy: {improvement:.2f}%")
     print(f"Total distance saved: {greedy_total_distance - ga_total_distance:.2f}")
+
+# Generate visualizations
+print(f"\n{'='*70}")
+print("Generating visualizations...")
+print(f"{'='*70}")
+
+plot_heatmap_comparison(city, greedy_visits, ga_visits, collection_count)
+plot_collection_statistics(greedy_distances, ga_distances, collection_numbers)
+plot_route_comparison(city, last_greedy_route, last_ga_route, last_collection_num)
+plot_aggregate_route_changes(city, all_removed_edges, all_added_edges, all_common_edges)
+
 
