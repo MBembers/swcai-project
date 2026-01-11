@@ -1,3 +1,6 @@
+run:
+  seed: 42
+  
 city:
   width: 200
   height: 200
@@ -5,6 +8,8 @@ city:
   num_bins: 100
   coordinate_rounding: 1
   progress_interval: 50
+  city_type: 'REALISTIC'
+  distribution_type: 'UNIFORM'
 
 bins:
   min_fill_level_ratio: 0.05

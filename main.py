@@ -1,4 +1,6 @@
 from src.config import CONFIG
+from src.seed import init_seed
+init_seed(CONFIG['run']['seed'])
 from src.city import City, CityType, DistributionType
 from src.agents import Truck
 from src.simulation import Simulation
@@ -14,8 +16,8 @@ city = City(
     height=CONFIG['city']['height'], 
     num_points=CONFIG['city']['num_points'], 
     num_bins=CONFIG['city']['num_bins'],
-    city_type=CityType.MANHATTAN,
-  distribution_type=DistributionType.EXPONENTIAL_DECAY
+    city_type=CityType[CONFIG['city']['city_type']],
+    distribution_type=DistributionType[CONFIG['city']['distribution_type']]
 )
 
 # ===== 2. Truck (Scaled Up) =====
