@@ -3,13 +3,16 @@ from typing import List, Callable
 from .config import CONFIG
 
 class GeneticOptimizer:
-    def __init__(self, bin_ids: List[int], fitness_fn: Callable, pop_size: int = None):
+    def __init__(self, bin_ids: List[int], fitness_fn: Callable, pop_size: int = None, baseline_route: List[int] = None):
         if pop_size is None:
             pop_size = CONFIG['evolution']['pop_size']
         self.bin_ids = bin_ids
         self.fitness_fn = fitness_fn
         self.pop_size = pop_size # Reduced from 150 to 50 for speed
+        
         self.population = [self._random_genome() for _ in range(pop_size)]
+        if baseline_route:
+            self.population[0] = baseline_route.copy()  # Seed with baseline route
 
     def _random_genome(self) -> List[int]:
         genome = self.bin_ids.copy()
