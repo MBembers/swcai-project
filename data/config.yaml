@@ -18,9 +18,12 @@ expert_rules:
   min_fill_threshold: 0.40
   critical_threshold: 0.90
 
+uncertainty:
+  fill_level_sigma_ratio: 0.05
+
 evolution:
   pop_size: 60
-  generations: 60
+  generations: 300
   elitism_count: 5
   tournament_selection_size: 15
   mutation_probability: 0.1
