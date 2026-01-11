@@ -1,4 +1,3 @@
-
 city:
   width: 200
   height: 200
@@ -21,9 +20,19 @@ expert_rules:
 uncertainty:
   fill_level_sigma_ratio: 0.05
 
+simulation:
+  days: 365
+  collection_interval_days: 7
+
+bin_refill:
+  base_rate_ratio: 0.1        
+  rate_sigma_ratio: 0.02      
+  noise_sigma_ratio: 0.005     # Daily noise on refill as ratio of capacity
+  learning_rate: 0.3           # EMA weight when updating learned fill rates
+
 evolution:
   pop_size: 60
-  generations: 300
+  generations: 100
   elitism_count: 5
   tournament_selection_size: 15
   mutation_probability: 0.1

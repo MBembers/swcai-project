@@ -27,56 +27,65 @@ truck = Truck(
 
 sim = Simulation(city, truck)
 
-# ===== 3. Optimization =====
-# Filter bins: Only tell the GA about bins that Expert Rules say we should collect.
-# This drastically reduces the search space for the GA.
-print("Pre-filtering bins via Expert Rules...")
-active_bin_ids = []
-for b in city.bins:
-    decision = sim.expert.evaluate(b)
-    if decision != Action.SKIP:
-        active_bin_ids.append(b.id)
+# ===== 3. Multi-day Simulation =====
+total_days = CONFIG['simulation']['days']
+interval = CONFIG['simulation']['collection_interval_days']
 
-print(f"Optimizing route for {len(active_bin_ids)} active bins (out of {len(city.bins)} total)...")
+print(f"Running simulation for {total_days} days, collections every {interval} days...")
 
-# ===== 3a. Baseline: Greedy Nearest-Neighbor on active bins =====
-# Use City.generate_greedy_route() and filter to the active set for a fair comparison
-greedy_full = city.generate_greedy_route()
-active_set = set(active_bin_ids)
-greedy_route = [bid for bid in greedy_full if bid in active_set]
+greedy_total_distance = 0.0
+ga_total_distance = 0.0
+collection_count = 0
 
-# Evaluate greedy route
-greedy_dist, greedy_penalty, greedy_collected = sim.simulate_route(greedy_route)
-print(f"Greedy route -> distance: {greedy_dist:.2f}, trips/penalty proxy: {greedy_penalty:.2f}, bins: {greedy_collected}")
+for day in range(1, total_days + 1):
+    sim.refill_bins(days=1)
 
-# ===== 3b. Genetic Algorithm Optimization =====  
-# Start with greedy route in population 
+    if day % interval != 0:
+        continue
 
-optimizer = GeneticOptimizer(
-    active_bin_ids,
-    sim.get_fitness,
-    pop_size=CONFIG['evolution']['pop_size'], # Slightly larger population for larger search space
-    baseline_route=greedy_route
-)
+    collection_count += 1
+    print(f"\n{'='*70}")
+    print(f"Day {day}: Collection Run #{collection_count}")
+    print(f"{'='*70}")
+    
+    # Use learned rates to choose bins likely to be worth visiting by next collection
+    active_bin_ids = sim.plan_active_bins(collection_interval_days=interval)
+    print(f"Active bins for this run: {len(active_bin_ids)} / {len(city.bins)}")
 
-print("Starting Evolution...")
-# Run for more generations to handle the complexity
-best_route = optimizer.evolve(generations=CONFIG['evolution']['generations'])
+    # Baseline greedy on the active set
+    greedy_full = city.generate_greedy_route()
+    active_set = set(active_bin_ids)
+    greedy_route = [bid for bid in greedy_full if bid in active_set]
+    greedy_dist, _, greedy_collected = sim.simulate_route(greedy_route)
+    print(f"Greedy -> distance: {greedy_dist:8.2f} | bins collected: {greedy_collected:3d}")
+    greedy_total_distance += greedy_dist
 
-# ===== 4. Compare and Visualize =====
-# Evaluate GA route
-ga_dist, ga_penalty, ga_collected = sim.simulate_route(best_route)
-print(f"Genetic route -> distance: {ga_dist:.2f}, trips/penalty proxy: {ga_penalty:.2f}, bins: {ga_collected}")
+    # Optimize with GA starting from greedy
+    optimizer = GeneticOptimizer(
+        active_bin_ids,
+        sim.get_fitness,
+        pop_size=CONFIG['evolution']['pop_size'],
+        baseline_route=greedy_route
+    )
 
-# Simple comparison summary
-if greedy_dist > 0:
-    improvement = (greedy_dist - ga_dist) / greedy_dist * 100.0
-    print(f"GA vs Greedy: distance change = {greedy_dist - ga_dist:.2f} ({improvement:.2f}% relative)")
-else:
-    print("Greedy distance is zero; relative comparison not applicable.")
+    best_route = optimizer.evolve(generations=CONFIG['evolution']['generations'])
+    ga_dist, _, ga_collected = sim.simulate_route(best_route)
+    print(f"GA     -> distance: {ga_dist:8.2f} | bins collected: {ga_collected:3d}")
+    ga_total_distance += ga_dist
 
-# Visualize both routes sequentially
-print("Plotting Greedy route...")
-# plot_simulation(city, truck, greedy_route, sim)
-print("Plotting Genetic route...")
-# plot_simulation(city, truck, best_route, sim)
+    # Execute best route, updating bin states and learning rates
+    best_executed_route = greedy_route if greedy_dist < ga_dist else best_route
+    exec_dist, _, exec_collected = sim.execute_route(best_executed_route)
+    print(f"Executed best route: distance {exec_dist:.2f}, bins {exec_collected}")
+
+print(f"\n{'='*70}")
+print("SIMULATION COMPLETE - FINAL COMPARISON")
+print(f"{'='*70}")
+print(f"Total collections: {collection_count}")
+print(f"Total distance (Greedy): {greedy_total_distance:.2f}")
+print(f"Total distance (GA):     {ga_total_distance:.2f}")
+if greedy_total_distance > 0:
+    improvement = (greedy_total_distance - ga_total_distance) / greedy_total_distance * 100.0
+    print(f"\nGA improvement over Greedy: {improvement:.2f}%")
+    print(f"Total distance saved: {greedy_total_distance - ga_total_distance:.2f}")
+
