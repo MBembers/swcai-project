@@ -4,8 +4,10 @@ from src.city import City, CityType, DistributionType
 from src.agents import Truck
 from src.simulation import Simulation
 from src.evolution import GeneticOptimizer
-from src.visualization import plot_simulation, plot_heatmap_comparison, plot_collection_statistics, plot_route_comparison, plot_aggregate_route_changes
+from src.visualization import plot_simulation, plot_heatmap_comparison, plot_collection_statistics, plot_route_comparison, plot_aggregate_route_changes, plot_greedy_vs_ga_times_per_day
 from src.expert_rules import Action
+from src.utils import log_time
+import time
 
 import argparse
 import src.config as config_module
@@ -86,6 +88,12 @@ last_collection_num = 0
 last_greedy_route = None
 last_ga_route = None
 
+
+start = log_time("Simulation Total", time.perf_counter())
+
+greedy_times = []
+ga_times = []
+
 for day in range(1, total_days + 1):
     sim.refill_bins(days=1)
 
@@ -105,6 +113,9 @@ for day in range(1, total_days + 1):
     print(f"Active bins for this run: {len(active_bin_ids)} / {len(city.bins)}")
 
     # Baseline greedy on the active set
+
+    start_greedy = time.perf_counter() # timer greedy
+
     greedy_full = city.generate_greedy_route()
     active_set = set(active_bin_ids)
     greedy_route = [bid for bid in greedy_full if bid in active_set]
@@ -116,6 +127,14 @@ for day in range(1, total_days + 1):
     # Track greedy visits
     for bin_id in greedy_route[:greedy_collected]:
         greedy_visits[bin_id] += 1
+
+
+    end_greedy = time.perf_counter()
+    greedy_times.append(end_greedy - start_greedy)
+
+
+
+    start_ga = time.perf_counter() # timer ga
 
     # Optimize with GA starting from greedy
     optimizer = GeneticOptimizer(
@@ -131,6 +150,12 @@ for day in range(1, total_days + 1):
         patience=CONFIG['evolution'].get('patience', 100)
     )
     ga_dist, _, ga_collected = sim.simulate_route(best_route)
+
+
+    end_ga = time.perf_counter()
+    ga_times.append(end_ga - start_ga)
+
+
     print(f"GA     -> distance: {ga_dist:8.2f} | bins collected: {ga_collected:3d} | generations: {generations_run}")
     ga_total_distance += ga_dist
     ga_distances.append(ga_dist)
@@ -166,6 +191,8 @@ for day in range(1, total_days + 1):
     exec_dist, _, exec_collected = sim.execute_route(best_executed_route)
     print(f"Executed best route: distance {exec_dist:.2f}, bins {exec_collected}")
 
+end = log_time("Simulation Total", start)
+
 print(f"\n{'='*70}")
 print("SIMULATION COMPLETE - FINAL COMPARISON")
 print(f"{'='*70}")
@@ -177,6 +204,13 @@ if greedy_total_distance > 0:
     print(f"\nGA improvement over Greedy: {improvement:.2f}%")
     print(f"Total distance saved: {greedy_total_distance - ga_total_distance:.2f}")
 
+print(f"\n{'='*70}")
+print("Timing Summary:")
+print(f"Total Simulation Time: {end - start:.2f} seconds")
+print(f"Greedy Times {sum(greedy_times):.2f} seconds over {collection_count} collections (avg {sum(greedy_times)/collection_count:.2f} s/collection)")
+print(f"GA Times     {sum(ga_times):.2f} seconds over {collection_count} collections (avg {sum(ga_times)/collection_count:.2f} s/collection)")
+
+
 # Generate visualizations
 print(f"\n{'='*70}")
 print("Generating visualizations...")
@@ -186,5 +220,5 @@ plot_heatmap_comparison(city, greedy_visits, ga_visits, collection_count)
 plot_collection_statistics(greedy_distances, ga_distances, collection_numbers)
 plot_route_comparison(city, last_greedy_route, last_ga_route, last_collection_num)
 plot_aggregate_route_changes(city, all_removed_edges, all_added_edges, all_common_edges)
-
+plot_greedy_vs_ga_times_per_day(greedy_times, ga_times, collection_numbers)
 

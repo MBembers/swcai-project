@@ -338,3 +338,26 @@ def plot_aggregate_route_changes(city, all_removed_edges, all_added_edges, all_c
     
     plt.tight_layout()
     plt.show()
+
+def plot_greedy_vs_ga_times_per_day(greedy_times, ga_times, total_days):
+    """
+    Plot computation times for Greedy vs GA methods per collection day.
+    
+    Args:
+        greedy_times: list of times taken by Greedy method per day
+        ga_times: list of times taken by GA method per day
+        total_days: total number of collection days
+    """
+    days = list(range(1,len(greedy_times)+1))
+    
+    plt.figure(figsize=(10, 6))
+    plt.plot(days, greedy_times, 'o-', label='Greedy Method', linewidth=2, markersize=6)
+    plt.plot(days, ga_times, 's-', label='GA Method', linewidth=2, markersize=6)
+    
+    plt.xlabel('Collection Day')
+    plt.ylabel('Computation Time (seconds)')
+    plt.title('Computation Time Comparison: Greedy vs GA Methods')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.show()
