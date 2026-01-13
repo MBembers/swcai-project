@@ -13,4 +13,3 @@ def load_config(config_path: str = None) -> dict:
     with open(config_path, "r") as f:
         return yaml.safe_load(f)
 
-    print(f'Loaded config from {config_path}')
