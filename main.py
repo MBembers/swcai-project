@@ -1,6 +1,5 @@
-from src.config import CONFIG
+import os
 from src.seed import init_seed
-init_seed(CONFIG['run']['seed'])
 from src.city import City, CityType, DistributionType
 from src.agents import Truck
 from src.simulation import Simulation
@@ -8,10 +7,38 @@ from src.evolution import GeneticOptimizer
 from src.visualization import plot_simulation, plot_heatmap_comparison, plot_collection_statistics, plot_route_comparison, plot_aggregate_route_changes
 from src.expert_rules import Action
 
+import argparse
+import src.config as config_module
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "config",
+        nargs="?",
+        default="config.yaml",
+        help="Config file (relative to data/ or absolute path)",
+    )
+    return parser.parse_args()
+
+args = parse_args()
+if args.config and not os.path.isabs(args.config):
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(base_dir, "data", args.config)
+else:
+    config_path = args.config
+
+config_module.CONFIG = config_module.load_config(config_path)
+print(f'Loaded config from {config_path}')
+
+CONFIG = config_module.CONFIG  # local alias (safe now)
+
+init_seed(CONFIG["run"]["seed"])
+
 # ===== 1. Setup City (Scaled Up) =====
 # Increased num_points to 1200 to accommodate 300 bins comfortably
 print("Generating City Graph...")
 city = City(
+    config=CONFIG,
     width=CONFIG['city']['width'], 
     height=CONFIG['city']['height'], 
     num_points=CONFIG['city']['num_points'], 
@@ -27,7 +54,7 @@ truck = Truck(
     capacity=CONFIG['truck']['capacity']
 )
 
-sim = Simulation(city, truck)
+sim = Simulation(CONFIG, city, truck)
 
 # ===== 3. Multi-day Simulation =====
 total_days = CONFIG['simulation']['days']
@@ -92,6 +119,7 @@ for day in range(1, total_days + 1):
 
     # Optimize with GA starting from greedy
     optimizer = GeneticOptimizer(
+        CONFIG,
         active_bin_ids,
         sim.get_fitness,
         pop_size=CONFIG['evolution']['pop_size'],

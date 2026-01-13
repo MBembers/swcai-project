@@ -3,7 +3,6 @@ import matplotlib.colors as mcolors
 import networkx as nx
 import numpy as np
 from itertools import cycle
-from .config import CONFIG
 
 def get_actual_path_coords(city, start_pos, end_pos):
     """
@@ -24,7 +23,7 @@ def get_actual_path_coords(city, start_pos, end_pos):
     except (nx.NetworkXNoPath, ValueError):
         return [start_pos, end_pos] # Fallback to straight line
 
-def plot_simulation(city, truck, route_ids, sim):
+def plot_simulation(city, CONFIG, truck, route_ids, sim):
     print("Preparing visualization...")
     plt.figure(figsize=tuple(CONFIG['visualization']['figure_size']))
     

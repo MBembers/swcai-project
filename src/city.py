@@ -5,7 +5,6 @@ import networkx as nx
 import math
 from enum import Enum
 from typing import Tuple, List, Dict
-from .config import CONFIG
 
 class CityType(Enum):
     REALISTIC = 1
@@ -17,23 +16,25 @@ class DistributionType(Enum):
     EXPONENTIAL_DECAY = 2
 
 class Bin:
-    def __init__(self, bin_id: int, capacity: float, pos: Tuple[float, float]):
+    def __init__(self, config: dict, bin_id: int, capacity: float, pos: Tuple[float, float]):
         self.id = bin_id
+        self.config = config
         self.capacity = capacity
         # Random fill between config min and 100%
-        self.fill_level = np.random.uniform(capacity * CONFIG['bins']['min_fill_level_ratio'], capacity) 
+        self.fill_level = np.random.uniform(capacity * self.config['bins']['min_fill_level_ratio'], capacity) 
         # Per-bin predisposition for how quickly it fills (ratio of capacity per day)
-        mu = CONFIG['bin_refill']['base_rate_ratio']
-        sigma = CONFIG['bin_refill']['rate_sigma_ratio']
+        mu = self.config['bin_refill']['base_rate_ratio']
+        sigma = self.config['bin_refill']['rate_sigma_ratio']
         self.fill_rate = max(0.0, np.random.normal(mu, sigma))
         self.pos = pos
 
 class City:
-    def __init__(self, width: float, height: float, num_points: int = 30, num_bins: int = 10, 
+    def __init__(self,config: dict, width: float, height: float, num_points: int = 30, num_bins: int = 10, 
                  city_type: CityType = CityType.REALISTIC, distribution_type: DistributionType = DistributionType.UNIFORM):
         self.width = width
         self.height = height
         self.city_type = city_type
+        self.config = config
         
         # 1. Generate Graph
         if city_type == CityType.REALISTIC:
@@ -78,8 +79,8 @@ class City:
 
         for i in range(num_bins):
             # Varied capacity for realism
-            cap = random.choice(CONFIG['bins']['capacity_options']) 
-            b = Bin(i, capacity=cap, pos=chosen_locs[i])
+            cap = random.choice(self.config['bins']['capacity_options']) 
+            b = Bin(self.config, i, capacity=cap, pos=chosen_locs[i])
             self.bins.append(b)
 
         # 4. Precompute Distances (Crucial for Speed)
@@ -102,8 +103,8 @@ class City:
                 0 <= p2[0] <= self.width and 0 <= p2[1] <= self.height):
                 
                 # Rounding keys is crucial for matching coords later
-                u = tuple(np.round(p1, CONFIG['city']['coordinate_rounding']))
-                v = tuple(np.round(p2, CONFIG['city']['coordinate_rounding']))
+                u = tuple(np.round(p1, self.config['city']['coordinate_rounding']))
+                v = tuple(np.round(p2, self.config['city']['coordinate_rounding']))
                 dist = np.linalg.norm(p1 - p2)
                 if u != v:
                     G.add_edge(u, v, weight=dist)
@@ -174,7 +175,7 @@ class City:
                     self.dist_cache[(start_node, end_node)] = length_dict[end_node]
             
             count += 1
-            if count % CONFIG['city']['progress_interval'] == 0:
+            if count % self.config['city']['progress_interval'] == 0:
                 print(f"  Mapped {count}/{total} nodes...")
 
     def distance(self, pos1, pos2):

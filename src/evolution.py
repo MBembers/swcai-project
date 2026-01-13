@@ -1,11 +1,11 @@
 import random
 from typing import List, Callable, Tuple
-from .config import CONFIG
 
 class GeneticOptimizer:
-    def __init__(self, bin_ids: List[int], fitness_fn: Callable, pop_size: int = None, baseline_route: List[int] = None):
+    def __init__(self,config:dict, bin_ids: List[int], fitness_fn: Callable, pop_size: int = None, baseline_route: List[int] = None):
+        self.config = config
         if pop_size is None:
-            pop_size = CONFIG['evolution']['pop_size']
+            pop_size = self.config['evolution']['pop_size']
         self.bin_ids = bin_ids
         self.fitness_fn = fitness_fn
         self.pop_size = pop_size
@@ -31,9 +31,9 @@ class GeneticOptimizer:
             (best_route, generations_run)
         """
         if max_generations is None:
-            max_generations = CONFIG['evolution']['generations']
+            max_generations = self.config['evolution']['generations']
         if patience is None:
-            patience = CONFIG['evolution'].get('patience', 100)
+            patience = self.config['evolution'].get('patience', 100)
         
         best_fitness = float('inf')
         generations_without_improvement = 0
@@ -55,12 +55,12 @@ class GeneticOptimizer:
                 generations_without_improvement += 1
             
             # Elitism: Keep top N
-            next_gen = [s[0] for s in scores[:CONFIG['evolution']['elitism_count']]]
+            next_gen = [s[0] for s in scores[:self.config['evolution']['elitism_count']]]
             
             # Breeding
             while len(next_gen) < self.pop_size:
-                parent1 = random.choice(scores[:CONFIG['evolution']['tournament_selection_size']])[0]
-                parent2 = random.choice(scores[:CONFIG['evolution']['tournament_selection_size']])[0]
+                parent1 = random.choice(scores[:self.config['evolution']['tournament_selection_size']])[0]
+                parent2 = random.choice(scores[:self.config['evolution']['tournament_selection_size']])[0]
                 
                 child = self._crossover(parent1, parent2)
                 self._mutate(child)
@@ -68,7 +68,7 @@ class GeneticOptimizer:
             
             self.population = next_gen
             
-            if gen % CONFIG['evolution']['progress_interval'] == 0:
+            if gen % self.config['evolution']['progress_interval'] == 0:
                 print(f"Gen {gen} | Cost: {current_best_fitness:.2f} | No improvement: {generations_without_improvement}/{patience}")
             
             # Early stopping criterion
@@ -93,6 +93,6 @@ class GeneticOptimizer:
         return child
 
     def _mutate(self, genome):
-        if random.random() < CONFIG['evolution']['mutation_probability']:
+        if random.random() < self.config['evolution']['mutation_probability']:
             i, j = random.sample(range(len(genome)), 2)
             genome[i], genome[j] = genome[j], genome[i]

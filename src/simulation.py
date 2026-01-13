@@ -3,14 +3,14 @@ from typing import List, Tuple
 from .city import City
 from .agents import Truck
 from .expert_rules import ExpertRules, Action
-from .config import CONFIG
 
 class Simulation:
-    def __init__(self, city: City, truck: Truck):
+    def __init__(self,config: dict, city: City, truck: Truck):
         self.city = city
         self.truck = truck
-        self.expert = ExpertRules(min_fill_threshold=CONFIG['expert_rules']['min_fill_threshold'])
-        base_rate = CONFIG['bin_refill']['base_rate_ratio']
+        self.config = config
+        self.expert = ExpertRules(config, min_fill_threshold=self.config['expert_rules']['min_fill_threshold'])
+        base_rate = self.config['bin_refill']['base_rate_ratio']
         # Track learned fill rates and visit history per bin
         self.bin_profiles = {
             b.id: {
@@ -24,7 +24,7 @@ class Simulation:
 
     def refill_bins(self, days: int = 1):
         """Advance time and refill bins according to predisposition plus noise."""
-        noise_sigma_ratio = CONFIG['bin_refill']['noise_sigma_ratio']
+        noise_sigma_ratio = self.config['bin_refill']['noise_sigma_ratio']
         for b in self.city.bins:
             expected_add = b.fill_rate * b.capacity * days
             noise = np.random.normal(0.0, b.capacity * noise_sigma_ratio * np.sqrt(days))
@@ -45,7 +45,7 @@ class Simulation:
         """Use cached observation if available, otherwise sample fresh."""
         if bin_id in self.current_observed_fills:
             return self.current_observed_fills[bin_id]
-        return self._get_observed_fill_level(self.city.bins[bin_id])
+        return self.config, _get_observed_fill_level(self.city.bins[bin_id])
 
     def _get_observed_fill_level(self, bin_obj) -> float:
         """
@@ -53,7 +53,7 @@ class Simulation:
         The true fill level is perturbed by a normal distribution (0 to 2 sigmas).
         """
         # Calculate sigma as a percentage of bin capacity from config
-        sigma_ratio = CONFIG['uncertainty']['fill_level_sigma_ratio']
+        sigma_ratio = self.config['uncertainty']['fill_level_sigma_ratio']
         sigma = bin_obj.capacity * sigma_ratio
         
         # Sample from normal distribution: mean = true fill level, std = sigma
@@ -126,7 +126,7 @@ class Simulation:
         Bins predicted to reach the expert threshold by the next collection are included.
         """
         active_bin_ids = []
-        threshold = CONFIG['expert_rules']['min_fill_threshold']
+        threshold = self.config['expert_rules']['min_fill_threshold']
         for b in self.city.bins:
             profile = self.bin_profiles[b.id]
             predicted_fill = min(
@@ -147,7 +147,7 @@ class Simulation:
         total_distance = 0.0
         bins_collected = 0
         penalty = 0.0
-        learning_rate = CONFIG['bin_refill']['learning_rate']
+        learning_rate = self.config['bin_refill']['learning_rate']
 
         for bin_id in proposed_sequence:
             target_bin = self.city.bins[bin_id]
