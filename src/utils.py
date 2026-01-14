@@ -11,7 +11,7 @@ def log_time(name, start_time):
     print(f"{name} took {end_time - start_time:.6f} seconds")
     return time.perf_counter()  # return new start for next measurement
 
-TIMINGS = {}
+TIMINGS = {} # for the derocator
 
 def timeit(task_dict=None):
     """
