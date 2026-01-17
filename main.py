@@ -4,7 +4,7 @@ from src.city import City, CityType, DistributionType
 from src.agents import Truck
 from src.simulation import Simulation
 from src.evolution import GeneticOptimizer
-from src.visualization import plot_simulation, plot_heatmap_comparison, plot_collection_statistics, plot_route_comparison, plot_aggregate_route_changes, plot_greedy_vs_ga_times_per_day
+from src.visualization import plot_simulation, plot_heatmap_comparison, plot_collection_statistics, plot_route_comparison, plot_aggregate_route_changes, plot_greedy_vs_ga_times_per_day, _get_route_edges
 from src.expert_rules import Action
 from src.utils import log_time
 import time
@@ -167,7 +167,6 @@ for day in range(1, total_days + 1):
     collection_numbers.append(collection_count)
     
     # Track route changes
-    from src.visualization import _get_route_edges
     greedy_edges = _get_route_edges(city, greedy_route)
     ga_edges = _get_route_edges(city, best_route)
     
@@ -216,9 +215,12 @@ print(f"\n{'='*70}")
 print("Generating visualizations...")
 print(f"{'='*70}")
 
-plot_heatmap_comparison(city, greedy_visits, ga_visits, collection_count)
-plot_collection_statistics(greedy_distances, ga_distances, collection_numbers)
+plot_simulation(city, CONFIG, truck, last_ga_route, sim)
+#plot_heatmap_comparison(city, greedy_visits, ga_visits, collection_count)
+#plot_collection_statistics(greedy_distances, ga_distances, collection_numbers)
 plot_route_comparison(city, last_greedy_route, last_ga_route, last_collection_num)
 plot_aggregate_route_changes(city, all_removed_edges, all_added_edges, all_common_edges)
-plot_greedy_vs_ga_times_per_day(greedy_times, ga_times, collection_numbers)
+#plot_greedy_vs_ga_times_per_day(greedy_times, ga_times, collection_numbers)
 
+import matplotlib.pyplot as plt
+plt.show()

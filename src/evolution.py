@@ -69,7 +69,8 @@ class GeneticOptimizer:
             self.population = next_gen
             
             if gen % self.config['evolution']['progress_interval'] == 0:
-                print(f"Gen {gen} | Cost: {current_best_fitness:.2f} | No improvement: {generations_without_improvement}/{patience}")
+                #print(f"Gen {gen} | Cost: {current_best_fitness:.2f} | No improvement: {generations_without_improvement}/{patience}")
+                print(f"\rGen {gen:03} | Cost: {current_best_fitness:.2f} | No improvement: {generations_without_improvement}/{patience}        ", end="", flush=True)
             
             # Early stopping criterion
             if generations_without_improvement >= patience:
