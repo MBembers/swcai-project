@@ -64,6 +64,11 @@ class GeneticOptimizer:
                 
                 child = self._crossover(parent1, parent2)
                 self._mutate(child)
+                
+                # Apply two-opt local search based on configured rate
+                two_opt_rate = self.config['evolution'].get('two_opt_rate', 0)
+                if random.random() < (two_opt_rate / 100.0):
+                    self._two_opt(child)
                 next_gen.append(child)
             
             self.population = next_gen
@@ -80,7 +85,15 @@ class GeneticOptimizer:
         return best_genome, gen + 1
 
     def _crossover(self, p1, p2):
-        # Order Crossover (OX)
+        crossover_type = self.config['evolution'].get('crossover_type', 'order')
+        
+        if crossover_type == '2-point':
+            return self._two_point_crossover(p1, p2)
+        else:
+            return self._order_crossover(p1, p2)
+    
+    def _order_crossover(self, p1, p2):
+        """Order Crossover (OX) - preserves relative order"""
         start, end = sorted(random.sample(range(len(p1)), 2))
         child = [None]*len(p1)
         child[start:end] = p1[start:end]
@@ -92,8 +105,50 @@ class GeneticOptimizer:
                     pointer += 1
                 child[pointer] = gene
         return child
+    
+    def _two_point_crossover(self, p1, p2):
+        """Two-point crossover for permutation encoding"""
+        n = len(p1)
+        # Select two crossover points
+        point1, point2 = sorted(random.sample(range(n), 2))
+        
+        # Create child with middle segment from p1
+        child = [None] * n
+        child[point1:point2] = p1[point1:point2]
+        
+        # Fill remaining positions with genes from p2 in order
+        p2_genes = [g for g in p2 if g not in child[point1:point2]]
+        
+        # Fill before first point
+        child[:point1] = p2_genes[:point1]
+        # Fill after second point
+        child[point2:] = p2_genes[point1:]
+        
+        return child
 
     def _mutate(self, genome):
         if random.random() < self.config['evolution']['mutation_probability']:
             i, j = random.sample(range(len(genome)), 2)
             genome[i], genome[j] = genome[j], genome[i]
+    
+    def _two_opt(self, genome):
+        """Apply two-opt local search improvement"""
+        n = len(genome)
+        improved = True
+        
+        while improved:
+            improved = False
+            for i in range(n - 1):
+                for j in range(i + 2, n):
+                    # Reverse segment between i and j
+                    new_genome = genome[:i+1] + genome[i+1:j+1][::-1] + genome[j+1:]
+                    
+                    # Check if this improves fitness
+                    if self.fitness_fn(new_genome) < self.fitness_fn(genome):
+                        genome[:] = new_genome
+                        improved = True
+                        break
+                if improved:
+                    break
+        
+        return genome

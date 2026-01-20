@@ -5,7 +5,7 @@ city:
   width: 200
   height: 200
   num_points: 1200
-  num_bins: 100
+  num_bins: 150
   coordinate_rounding: 1
   progress_interval: 50
   city_type: 'REALISTIC'
@@ -26,7 +26,7 @@ uncertainty:
   fill_level_sigma_ratio: 0.05
 
 simulation:
-  days: 365
+  days: 10
   collection_interval_days: 5
 
 bin_refill:
@@ -36,12 +36,14 @@ bin_refill:
   learning_rate: 0.3           # EMA weight when updating learned fill rates
 
 evolution:
-  pop_size: 60
+  pop_size: 150
   generations: 1000
-  patience: 100
-  elitism_count: 5
-  tournament_selection_size: 15
-  mutation_probability: 0.1
+  patience: 500
+  elitism_count: 3
+  tournament_selection_size: 10
+  mutation_probability: 0.8
+  crossover_type: 'order'  # Options: 'order' (OX), '2-point'
+  two_opt_rate: 0  # Percentage (0-100) of applying two-opt local search
   progress_interval: 10
 
 visualization:
