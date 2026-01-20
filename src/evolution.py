@@ -9,6 +9,9 @@ class GeneticOptimizer:
         self.bin_ids = bin_ids
         self.fitness_fn = fitness_fn
         self.pop_size = pop_size
+        self.crossover_method = self.config['evolution'].get('crossover_method', 'order')
+        self.two_opt_rate = float(self.config['evolution'].get('two_opt_rate', 0.0))
+        self.two_opt_iterations = int(self.config['evolution'].get('two_opt_iterations', 5))
         
         self.population = [self._random_genome() for _ in range(pop_size)]
         if baseline_route:
@@ -64,6 +67,8 @@ class GeneticOptimizer:
                 
                 child = self._crossover(parent1, parent2)
                 self._mutate(child)
+                if self.two_opt_rate > 0 and random.random() < self.two_opt_rate:
+                    child = self._two_opt(child)
                 next_gen.append(child)
             
             self.population = next_gen
@@ -79,6 +84,11 @@ class GeneticOptimizer:
         return best_genome, gen + 1
 
     def _crossover(self, p1, p2):
+        if self.crossover_method == 'two_point':
+            return self._two_point_crossover(p1, p2)
+        return self._order_crossover(p1, p2)
+
+    def _order_crossover(self, p1, p2):
         # Order Crossover (OX)
         start, end = sorted(random.sample(range(len(p1)), 2))
         child = [None]*len(p1)
@@ -92,7 +102,49 @@ class GeneticOptimizer:
                 child[pointer] = gene
         return child
 
+    def _two_point_crossover(self, p1, p2):
+        # Partially mapped crossover tailored for permutations
+        cut1, cut2 = sorted(random.sample(range(len(p1)), 2))
+        child = [None] * len(p1)
+
+        child[cut1:cut2] = p1[cut1:cut2]
+        mapping = {p2[i]: p1[i] for i in range(cut1, cut2)}
+
+        for idx in range(len(p2)):
+            if child[idx] is not None:
+                continue
+            gene = p2[idx]
+            visited = set()
+            # Follow mapping while gene conflicts with the preserved slice
+            while gene in mapping and gene in child[cut1:cut2]:
+                if gene in visited:  # break potential cycles
+                    break
+                visited.add(gene)
+                gene = mapping[gene]
+            child[idx] = gene
+
+        return child
+
     def _mutate(self, genome):
         if random.random() < self.config['evolution']['mutation_probability']:
             i, j = random.sample(range(len(genome)), 2)
             genome[i], genome[j] = genome[j], genome[i]
+
+    def _two_opt(self, genome: List[int]) -> List[int]:
+        if len(genome) < 4:
+            return genome
+
+        best_route = genome
+        best_cost = self.fitness_fn(best_route)
+
+        for _ in range(max(1, self.two_opt_iterations)):
+            i, j = sorted(random.sample(range(len(best_route)), 2))
+            if j - i < 2:
+                continue
+            candidate = best_route[:i] + list(reversed(best_route[i:j])) + best_route[j:]
+            candidate_cost = self.fitness_fn(candidate)
+            if candidate_cost < best_cost:
+                best_route = candidate
+                best_cost = candidate_cost
+
+        return best_route
