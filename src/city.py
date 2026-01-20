@@ -5,7 +5,6 @@ import networkx as nx
 import math
 from enum import Enum
 from typing import Tuple, List, Dict
-from .config import CONFIG
 
 class CityType(Enum):
     REALISTIC = 1
@@ -17,19 +16,25 @@ class DistributionType(Enum):
     EXPONENTIAL_DECAY = 2
 
 class Bin:
-    def __init__(self, bin_id: int, capacity: float, pos: Tuple[float, float]):
+    def __init__(self, config: dict, bin_id: int, capacity: float, pos: Tuple[float, float]):
         self.id = bin_id
+        self.config = config
         self.capacity = capacity
         # Random fill between config min and 100%
-        self.fill_level = np.random.uniform(capacity * CONFIG['bins']['min_fill_level_ratio'], capacity) 
+        self.fill_level = np.random.uniform(capacity * self.config['bins']['min_fill_level_ratio'], capacity) 
+        # Per-bin predisposition for how quickly it fills (ratio of capacity per day)
+        mu = self.config['bin_refill']['base_rate_ratio']
+        sigma = self.config['bin_refill']['rate_sigma_ratio']
+        self.fill_rate = max(0.0, np.random.normal(mu, sigma))
         self.pos = pos
 
 class City:
-    def __init__(self, width: float, height: float, num_points: int = 30, num_bins: int = 10, 
+    def __init__(self,config: dict, width: float, height: float, num_points: int = 30, num_bins: int = 10, 
                  city_type: CityType = CityType.REALISTIC, distribution_type: DistributionType = DistributionType.UNIFORM):
         self.width = width
         self.height = height
         self.city_type = city_type
+        self.config = config
         
         # 1. Generate Graph
         if city_type == CityType.REALISTIC:
@@ -74,12 +79,15 @@ class City:
 
         for i in range(num_bins):
             # Varied capacity for realism
-            cap = random.choice(CONFIG['bins']['capacity_options']) 
-            b = Bin(i, capacity=cap, pos=chosen_locs[i])
+            cap = random.choice(self.config['bins']['capacity_options']) 
+            b = Bin(self.config, i, capacity=cap, pos=chosen_locs[i])
             self.bins.append(b)
 
-        # 4. Precompute Distances (Crucial for Speed)
-        self.dist_cache = {}
+        self.dist_matrix = []
+        self.path_matrix = [] 
+        # Mapping from POI coordinate -> matrix index (built in _precompute_poi_distances)
+        self.poi_to_idx = {}
+
         if self.graph:
             print("Pre-computing city distances (this may take a moment)...")
             self._precompute_poi_distances()
@@ -98,8 +106,8 @@ class City:
                 0 <= p2[0] <= self.width and 0 <= p2[1] <= self.height):
                 
                 # Rounding keys is crucial for matching coords later
-                u = tuple(np.round(p1, CONFIG['city']['coordinate_rounding']))
-                v = tuple(np.round(p2, CONFIG['city']['coordinate_rounding']))
+                u = tuple(np.round(p1, self.config['city']['coordinate_rounding']))
+                v = tuple(np.round(p2, self.config['city']['coordinate_rounding']))
                 dist = np.linalg.norm(p1 - p2)
                 if u != v:
                     G.add_edge(u, v, weight=dist)
@@ -149,48 +157,106 @@ class City:
         return G
         
     
+
     def _precompute_poi_distances(self):
-        """Calculates shortest paths ONLY between Depot and Bins, and Bin to Bin."""
-        # Points of Interest: Depot + All Bins
+        """Calculates shortest paths between Depot and Bins into an (N+1)x(N+1) matrix."""
+        # 1. Define POIs and create index mapping
+        # Index 0 is always the Depot
         pois = [self.depot] + [b.pos for b in self.bins]
+        num_pois = len(pois)
         
-        # We use multi-source dijkstra for efficiency
-        # This calculates distance from one source to ALL other nodes in the graph
-        # We just save the ones that matter (other POIs)
+        # Create the N x N matrix initialized to infinity
+        self.dist_matrix = np.full((num_pois, num_pois), np.inf)
+        self.path_matrix = [[[] for _ in range(num_pois)] for _ in range(num_pois)]
+
+        # Mapping to help translate coordinate tuples back to matrix indices
+        self.poi_to_idx = {pos: i for i, pos in enumerate(pois)}
+         
+        print(f"Pre-computing {num_pois}x{num_pois} distance matrix...")
         
-        count = 0
-        total = len(pois)
-        
-        for start_node in pois:
-            # Dijkstra returns dict: {target_node: distance}
-            length_dict = nx.single_source_dijkstra_path_length(self.graph, start_node, weight='weight')
+        # Note: depot and bins are chosen from valid graph nodes, so Dijkstra should work.
+        # Still, be defensive in case depot isn't a graph node (e.g., graph missing / modified).
+        for i, start_node in enumerate(pois):
+            # Dijkstra from this specific POI to all other nodes in the road graph
+            if start_node not in self.graph:
+                # If a POI isn't an actual graph node, we can't run Dijkstra from it.
+                # Keep row as inf; distance() will fall back to graph/euclid as needed.
+                continue
+
+            lengths, paths = nx.single_source_dijkstra(self.graph, start_node, weight='weight')
             
-            for end_node in pois:
-                if end_node in length_dict:
-                    self.dist_cache[(start_node, end_node)] = length_dict[end_node]
+            for j in range(num_pois):
+                end_node = pois[j]
+                if end_node in lengths:
+                    # Store distance    
+                    self.dist_matrix[i, j] = lengths[end_node]
+                    # Store the list of vertices (e.g., [(x1,y1), (x2,y2)...])
+                    self.path_matrix[i][j] = paths[end_node] 
             
-            count += 1
-            if count % CONFIG['city']['progress_interval'] == 0:
-                print(f"  Mapped {count}/{total} nodes...")
 
     def distance(self, pos1, pos2):
-        # 1. Check Cache
-        if (pos1, pos2) in self.dist_cache:
-            return self.dist_cache[(pos1, pos2)]
-        
-        # 2. Symmetrical check
-        if (pos2, pos1) in self.dist_cache:
-            return self.dist_cache[(pos2, pos1)]
+        """
+        Retrieves the shortest path distance. 
+        Uses O(1) matrix lookup for POIs, falls back to Dijkstra/Euclidean for others.
+        """
+        # 0. Trivial case
+        if pos1 == pos2:
+            return 0.0
 
-        # 3. Fallback (Slow, used for visualization plotting only)
+        # 1. Check if both positions are in our POI Matrix
+        if self.poi_to_idx and pos1 in self.poi_to_idx and pos2 in self.poi_to_idx:
+            idx1 = self.poi_to_idx[pos1]
+            idx2 = self.poi_to_idx[pos2]
+            return self.dist_matrix[idx1, idx2]
+        else:
+            print("Positions not in POI matrix, falling back to graph distance.")
+        
+        # 2. Fallback: If one or both points are NOT POIs (e.g., during plotting or dynamic events)
         if self.graph:
             try:
+                # Check for direct road distance
                 return nx.shortest_path_length(self.graph, pos1, pos2, weight='weight')
-            except:
+            except (nx.NetworkXNoPath, nx.NodeNotFound):
+                # If nodes aren't in the graph or no path exists, use scaled Euclidean
                 return np.linalg.norm(np.array(pos1) - np.array(pos2)) * 2
         
-        return np.linalg.norm(np.array(pos1) - np.array(pos2))
-    
+        # 3. Last Resort: Simple straight-line distance
+        return np.linalg.norm(np.array(pos1) - np.array(pos2))    
+
+
+    def get_path(self, pos1, pos2):
+        """Return a list of graph nodes representing the route from pos1 to pos2.
+
+        If both endpoints are POIs (depot or bins), returns the precomputed path
+        from `self.path_matrix`.
+
+        Falls back to NetworkX shortest path when possible. If either point isn't
+        a graph node, falls back to a straight line [pos1, pos2].
+        """
+        if pos1 == pos2:
+            return [pos1]
+
+        # Fast path: POI -> POI
+        if self.poi_to_idx and pos1 in self.poi_to_idx and pos2 in self.poi_to_idx:
+            i = self.poi_to_idx[pos1]
+            j = self.poi_to_idx[pos2]
+            path = self.path_matrix[i][j]
+            if path:
+                return path
+
+        if not self.graph:
+            return [pos1, pos2]
+
+        # If positions aren't nodes, we can't run shortest_path on them.
+        if pos1 not in self.graph or pos2 not in self.graph:
+            return [pos1, pos2]
+
+        try:
+            return nx.shortest_path(self.graph, pos1, pos2, weight='weight')
+        except (nx.NetworkXNoPath, nx.NodeNotFound):
+            return [pos1, pos2]
+
+
     def generate_greedy_route(self) -> List[int]:
         """
         Generate a simple collection route using nearest-neighbor heuristic.
@@ -201,24 +267,27 @@ class City:
         """
         if not self.bins:
             return []
-        
-        # Start from depot
-        current_pos = self.depot
-        unvisited = set(range(len(self.bins)))
+
+        # Start from depot (POI index 0)
+        current_idx = 0
+        # Unvisited POI indices correspond to bins: 1..N
+        unvisited = set(range(1, len(self.bins) + 1))
         route = []
         
         while unvisited:
-            # Find nearest unvisited bin
-            nearest_bin_id = min(
+            next_poi_idx = min(
                 unvisited,
-                key=lambda bid: self.distance(current_pos, self.bins[bid].pos)
+                key=lambda idx: self.dist_matrix[current_idx, idx]
             )
             
-            route.append(nearest_bin_id)
-            current_pos = self.bins[nearest_bin_id].pos
-            unvisited.remove(nearest_bin_id)
+            # Store the bin ID (which is index - 1)
+            route.append(next_poi_idx - 1)
+            
+            # Update current position and remove from unvisited
+            current_idx = next_poi_idx
+            unvisited.remove(next_poi_idx)
         
         return route
-
+        
     def reset_all(self):
         pass

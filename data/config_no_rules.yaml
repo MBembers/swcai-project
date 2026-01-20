@@ -19,8 +19,8 @@ truck:
   capacity: 6000.0
 
 expert_rules:
-  min_fill_threshold: 0.40
-  critical_threshold: 0.90
+  min_fill_threshold: 0.00
+  critical_threshold: 0.00
 
 uncertainty:
   fill_level_sigma_ratio: 0.05
