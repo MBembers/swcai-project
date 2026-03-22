@@ -36,7 +36,7 @@ bin_refill:
   learning_rate: 0.3           # EMA weight when updating learned fill rates
 
 evolution:
-  optimizer: 'genetic'
+  optimizer: 'LSHADE'
   pop_size: 60
   generations: 1000
   patience: 100

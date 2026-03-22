@@ -1,5 +1,6 @@
 import random
 from typing import List, Callable, Tuple
+from .lshade import LShadeOptimizer
 
 class GeneticOptimizer:
     def __init__(self,config:dict, bin_ids: List[int], fitness_fn: Callable, pop_size: int = None, baseline_route: List[int] = None):

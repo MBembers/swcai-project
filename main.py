@@ -4,6 +4,7 @@ from src.city import City, CityType, DistributionType
 from src.agents import Truck
 from src.simulation import Simulation
 from src.evolution import GeneticOptimizer
+from src.lshade import LShadeOptimizer, ALShadeOptimizer
 from src.visualization import plot_simulation, plot_heatmap_comparison, plot_collection_statistics, plot_route_comparison, plot_aggregate_route_changes, plot_greedy_vs_ga_times_per_day, _get_route_edges
 from src.expert_rules import Action
 from src.utils import log_time
@@ -137,13 +138,30 @@ for day in range(1, total_days + 1):
     start_ga = time.perf_counter() # timer ga
 
     # Optimize with GA starting from greedy
-    optimizer = GeneticOptimizer(
-        CONFIG,
-        active_bin_ids,
-        sim.get_fitness,
-        pop_size=CONFIG['evolution']['pop_size'],
-        baseline_route=greedy_route
-    )
+    optimizer_type = CONFIG.get('evolution', {}).get('optimizer', 'alshade').lower()
+    if optimizer_type == 'lshade':
+        optimizer = LShadeOptimizer(
+            CONFIG,
+            active_bin_ids,
+            sim.get_fitness,
+            pop_size=CONFIG['evolution']['pop_size'],
+            baseline_route=greedy_route
+        )
+    elif optimizer_type == 'genetic':
+        optimizer = GeneticOptimizer(
+            CONFIG,
+            active_bin_ids,
+            sim.get_fitness,
+            pop_size=CONFIG['evolution']['pop_size']
+        )
+    else: # Default to alshade
+        optimizer = ALShadeOptimizer(
+            CONFIG,
+            active_bin_ids,
+            sim.get_fitness,
+            pop_size=CONFIG['evolution']['pop_size'],
+            baseline_route=greedy_route
+        )
 
     best_route, generations_run = optimizer.evolve(
         max_generations=CONFIG['evolution']['generations'],
