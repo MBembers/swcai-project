@@ -9,7 +9,6 @@ from typing import Tuple, List, Dict
 class CityType(Enum):
     REALISTIC = 1
     MANHATTAN = 2
-    RANDOM = 3
 
 class DistributionType(Enum):
     UNIFORM = 1

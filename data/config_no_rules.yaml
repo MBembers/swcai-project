@@ -42,6 +42,9 @@ evolution:
   elitism_count: 5
   tournament_selection_size: 15
   mutation_probability: 0.1
+  crossover_method: 'order'     # options: 'order', 'two_point'
+  two_opt_rate: 0.05            # probability (0.0-1.0) e.g., 0.01, 0.05, 0.10
+  two_opt_iterations: 5         # attempts per 2-opt call
   progress_interval: 10
 
 visualization:
